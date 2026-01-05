@@ -14,7 +14,71 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      channels: {
+        Row: {
+          color: string | null
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      generated_links: {
+        Row: {
+          ad_copy: string
+          channel_id: string | null
+          clicks: number | null
+          created_at: string
+          destination_url: string
+          dub_link_id: string | null
+          id: string
+          short_link: string
+        }
+        Insert: {
+          ad_copy: string
+          channel_id?: string | null
+          clicks?: number | null
+          created_at?: string
+          destination_url: string
+          dub_link_id?: string | null
+          id?: string
+          short_link: string
+        }
+        Update: {
+          ad_copy?: string
+          channel_id?: string | null
+          clicks?: number | null
+          created_at?: string
+          destination_url?: string
+          dub_link_id?: string | null
+          id?: string
+          short_link?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "generated_links_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
