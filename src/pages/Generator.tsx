@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Sparkles, Copy, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { ChannelSelector } from "@/components/ChannelSelector";
+import { CampaignSelector } from "@/components/CampaignSelector";
 import { GeneratedBlock } from "@/components/GeneratedBlock";
 import { useChannels } from "@/hooks/useChannels";
 import { useCreateDubLink } from "@/hooks/useDubApi";
@@ -19,6 +20,7 @@ export default function Generator() {
   const [adCopy, setAdCopy] = useState("");
   const [destinationUrl, setDestinationUrl] = useState("https://example.com");
   const [selectedChannels, setSelectedChannels] = useState<string[]>([]);
+  const [selectedCampaign, setSelectedCampaign] = useState<string | null>(null);
   const [generatedBlocks, setGeneratedBlocks] = useState<GeneratedBlockData[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -28,15 +30,15 @@ export default function Generator() {
 
   const handleGenerate = async () => {
     if (!adCopy.trim()) {
-      toast.error("Please enter ad copy");
+      toast.error("נא להזין טקסט פרסומי");
       return;
     }
     if (selectedChannels.length === 0) {
-      toast.error("Please select at least one channel");
+      toast.error("נא לבחור לפחות ערוץ אחד");
       return;
     }
     if (!destinationUrl.trim()) {
-      toast.error("Please enter a destination URL");
+      toast.error("נא להזין כתובת יעד");
       return;
     }
 
@@ -54,7 +56,7 @@ export default function Generator() {
         const url = new URL(destinationUrl);
         url.searchParams.set("utm_source", channel.name.toLowerCase().replace(/\s+/g, "_"));
         url.searchParams.set("utm_medium", "social");
-        url.searchParams.set("utm_campaign", "general");
+        url.searchParams.set("utm_campaign", selectedCampaign ? "campaign" : "general");
 
         // Create short link via Dub.co
         const dubLink = await createDubLink.mutateAsync({
@@ -65,6 +67,7 @@ export default function Generator() {
         // Save to database
         await createGeneratedLink.mutateAsync({
           channel_id: channelId,
+          campaign_id: selectedCampaign || undefined,
           short_link: dubLink.shortLink,
           destination_url: url.toString(),
           ad_copy: adCopy,
@@ -83,13 +86,13 @@ export default function Generator() {
         setGeneratedBlocks([...newBlocks]);
       } catch (error) {
         console.error(`Error creating link for ${channel.name}:`, error);
-        toast.error(`Failed to create link for ${channel.name}`);
+        toast.error(`נכשל ביצירת לינק ל-${channel.name}`);
       }
     }
 
     setIsGenerating(false);
     if (newBlocks.length > 0) {
-      toast.success(`Generated ${newBlocks.length} tracking links!`);
+      toast.success(`נוצרו ${newBlocks.length} לינקים מעוקבים!`);
     }
   };
 
@@ -100,56 +103,63 @@ export default function Generator() {
 
     try {
       await navigator.clipboard.writeText(allText);
-      toast.success("All blocks copied to clipboard!");
+      toast.success("כל הבלוקים הועתקו ללוח!");
     } catch (err) {
-      toast.error("Failed to copy");
+      toast.error("ההעתקה נכשלה");
     }
   };
 
   return (
-    <div className="min-h-screen lg:pl-0 pt-16 lg:pt-0">
+    <div className="min-h-screen lg:pr-0 pt-16 lg:pt-0">
       <div className="max-w-4xl mx-auto p-4 lg:p-8">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-2xl lg:text-3xl font-bold text-foreground mb-2">
-            Content Generator
+            יצירת קישורים
           </h1>
           <p className="text-muted-foreground">
-            Create tracked marketing links for your campaigns
+            צרו לינקים מעוקבים לקמפיינים השיווקיים שלכם
           </p>
         </div>
 
         {/* Input Form */}
         <div className="bg-card rounded-2xl border border-border p-4 lg:p-6 shadow-sm mb-8">
           <div className="space-y-6">
+            {/* Campaign Selector */}
+            <CampaignSelector
+              selectedCampaign={selectedCampaign}
+              onSelect={setSelectedCampaign}
+            />
+
             {/* Destination URL */}
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">
-                Destination URL
+                כתובת יעד
               </label>
               <input
                 type="url"
                 value={destinationUrl}
                 onChange={(e) => setDestinationUrl(e.target.value)}
                 placeholder="https://your-landing-page.com"
-                className="w-full px-4 py-3 rounded-lg border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors"
+                dir="ltr"
+                className="w-full px-4 py-3 rounded-lg border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors text-left"
               />
             </div>
 
             {/* Ad Copy */}
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">
-                Ad Copy
+                טקסט פרסומי
               </label>
               <textarea
                 value={adCopy}
                 onChange={(e) => setAdCopy(e.target.value)}
-                placeholder="Enter your promotional text here..."
+                placeholder="הזינו כאן את הטקסט הפרסומי שלכם..."
                 rows={5}
                 className="w-full px-4 py-3 rounded-lg border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors resize-none"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                {adCopy.length} characters
+                {adCopy.length} תווים
               </p>
             </div>
 
@@ -170,12 +180,12 @@ export default function Generator() {
               {isGenerating ? (
                 <>
                   <Loader2 className="h-5 w-5 animate-spin" />
-                  Generating...
+                  יוצר...
                 </>
               ) : (
                 <>
                   <Sparkles className="h-5 w-5" />
-                  Generate Blocks
+                  צור בלוקים
                 </>
               )}
             </button>
@@ -187,14 +197,14 @@ export default function Generator() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-foreground">
-                Ready-to-Post Blocks
+                בלוקים מוכנים לפרסום
               </h2>
               <button
                 onClick={handleCopyAll}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors text-sm font-medium"
               >
                 <Copy className="h-4 w-4" />
-                Copy All
+                העתק הכל
               </button>
             </div>
 

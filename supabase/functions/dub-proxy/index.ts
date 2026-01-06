@@ -70,6 +70,39 @@ serve(async (req) => {
         break;
       }
 
+      case 'get-bulk-analytics': {
+        const { linkIds } = payload;
+        console.log('Fetching bulk analytics for links:', linkIds);
+        
+        // Fetch analytics for each link
+        const analyticsResults: Record<string, number> = {};
+        
+        for (const linkId of linkIds) {
+          try {
+            const analyticsResponse = await fetch(
+              `${baseUrl}/analytics?workspaceId=${DUB_WORKSPACE_ID}&linkId=${linkId}&event=clicks`,
+              { method: 'GET', headers }
+            );
+            
+            if (analyticsResponse.ok) {
+              const analyticsData = await analyticsResponse.json();
+              // Dub.co returns clicks count directly or in an object
+              analyticsResults[linkId] = typeof analyticsData === 'number' 
+                ? analyticsData 
+                : (analyticsData.clicks || analyticsData.count || 0);
+            }
+          } catch (err) {
+            console.error(`Error fetching analytics for ${linkId}:`, err);
+            analyticsResults[linkId] = 0;
+          }
+        }
+        
+        return new Response(
+          JSON.stringify(analyticsResults),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       default:
         return new Response(
           JSON.stringify({ error: 'Unknown action' }),

@@ -1,4 +1,4 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 interface CreateLinkPayload {
@@ -10,6 +10,11 @@ interface DubLink {
   id: string;
   shortLink: string;
   url: string;
+  clicks?: number;
+}
+
+interface DubAnalytics {
+  clicks: number;
 }
 
 export function useCreateDubLink() {
@@ -44,6 +49,24 @@ export function useGetDubLinks() {
       if (data.error) throw new Error(data.error);
       
       return data as DubLink[];
+    },
+  });
+}
+
+export function useSyncAnalytics() {
+  return useMutation({
+    mutationFn: async (linkIds: string[]): Promise<Record<string, number>> => {
+      const { data, error } = await supabase.functions.invoke("dub-proxy", {
+        body: {
+          action: "get-bulk-analytics",
+          payload: { linkIds },
+        },
+      });
+
+      if (error) throw error;
+      if (data.error) throw new Error(data.error);
+      
+      return data;
     },
   });
 }

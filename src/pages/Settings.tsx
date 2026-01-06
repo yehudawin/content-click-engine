@@ -25,7 +25,7 @@ export default function Settings() {
   const handleAddChannel = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newChannelName.trim()) {
-      toast.error("Please enter a channel name");
+      toast.error("נא להזין שם ערוץ");
       return;
     }
 
@@ -34,66 +34,66 @@ export default function Settings() {
         name: newChannelName.trim(),
         color: newChannelColor,
       });
-      toast.success("Channel added!");
+      toast.success("הערוץ נוסף בהצלחה!");
       setNewChannelName("");
     } catch (error: any) {
       if (error.message?.includes("duplicate")) {
-        toast.error("Channel already exists");
+        toast.error("ערוץ זה כבר קיים");
       } else {
-        toast.error("Failed to add channel");
+        toast.error("הוספת הערוץ נכשלה");
       }
     }
   };
 
   const handleDeleteChannel = async (id: string, name: string) => {
-    if (!confirm(`Delete "${name}"? This will also delete all associated links.`)) {
+    if (!confirm(`למחוק את "${name}"? פעולה זו תמחק גם את כל הלינקים המשויכים.`)) {
       return;
     }
 
     try {
       await deleteChannel.mutateAsync(id);
-      toast.success("Channel deleted");
+      toast.success("הערוץ נמחק בהצלחה");
     } catch (error) {
-      toast.error("Failed to delete channel");
+      toast.error("מחיקת הערוץ נכשלה");
     }
   };
 
   return (
-    <div className="min-h-screen lg:pl-0 pt-16 lg:pt-0">
+    <div className="min-h-screen lg:pr-0 pt-16 lg:pt-0">
       <div className="max-w-2xl mx-auto p-4 lg:p-8">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-2xl lg:text-3xl font-bold text-foreground mb-2">
-            Settings
+            הגדרות
           </h1>
           <p className="text-muted-foreground">
-            Manage your distribution channels
+            ניהול ערוצי ההפצה שלכם
           </p>
         </div>
 
         {/* Add Channel Form */}
         <div className="bg-card rounded-xl border border-border p-4 lg:p-6 shadow-sm mb-8">
           <h2 className="text-lg font-semibold text-foreground mb-4">
-            Add New Channel
+            הוספת ערוץ חדש
           </h2>
 
           <form onSubmit={handleAddChannel} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">
-                Channel Name
+                שם הערוץ
               </label>
               <input
                 type="text"
                 value={newChannelName}
                 onChange={(e) => setNewChannelName(e.target.value)}
-                placeholder="e.g., Instagram, LinkedIn..."
+                placeholder="לדוגמה: Instagram, LinkedIn..."
                 className="w-full px-4 py-3 rounded-lg border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors"
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">
-                Color
+                צבע
               </label>
               <div className="flex flex-wrap gap-2">
                 {PRESET_COLORS.map((color) => (
@@ -122,7 +122,7 @@ export default function Settings() {
               ) : (
                 <Plus className="h-5 w-5" />
               )}
-              Add Channel
+              הוסף ערוץ
             </button>
           </form>
         </div>
@@ -131,7 +131,7 @@ export default function Settings() {
         <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
           <div className="p-4 lg:p-6 border-b border-border">
             <h2 className="text-lg font-semibold text-foreground">
-              Your Channels
+              הערוצים שלכם
             </h2>
           </div>
 
@@ -165,7 +165,7 @@ export default function Settings() {
             </ul>
           ) : (
             <div className="p-8 text-center text-muted-foreground">
-              <p>No channels yet. Add your first one above!</p>
+              <p>אין ערוצים עדיין. הוסיפו את הערוץ הראשון למעלה!</p>
             </div>
           )}
         </div>

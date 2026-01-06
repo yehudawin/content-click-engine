@@ -53,14 +53,14 @@ export function ChannelSelector({
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <label className="text-sm font-medium text-foreground">
-          Target Channels
+          ערוצי הפצה
         </label>
         <button
           type="button"
           onClick={selectAll}
           className="text-xs text-primary hover:underline"
         >
-          {selectedChannels.length === channels.length ? "Deselect all" : "Select all"}
+          {selectedChannels.length === channels.length ? "בטל הכל" : "בחר הכל"}
         </button>
       </div>
 
@@ -92,7 +92,7 @@ export function ChannelSelector({
 
       {selectedChannels.length > 0 && (
         <p className="text-xs text-muted-foreground">
-          {selectedChannels.length} channel{selectedChannels.length !== 1 ? "s" : ""} selected
+          נבחרו {selectedChannels.length} ערוצים
         </p>
       )}
     </div>

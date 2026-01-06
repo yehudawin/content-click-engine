@@ -1,12 +1,13 @@
-import { Link2, BarChart3, Settings, Menu, X, Sparkles } from "lucide-react";
+import { Link2, BarChart3, Settings, Menu, X, Sparkles, FolderKanban } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { title: "Generator", url: "/", icon: Sparkles },
-  { title: "Analytics", url: "/analytics", icon: BarChart3 },
-  { title: "Settings", url: "/settings", icon: Settings },
+  { title: "יצירת קישורים", url: "/", icon: Sparkles },
+  { title: "קמפיינים", url: "/campaigns", icon: FolderKanban },
+  { title: "אנליטיקס", url: "/analytics", icon: BarChart3 },
+  { title: "הגדרות", url: "/settings", icon: Settings },
 ];
 
 export function AppSidebar() {
@@ -17,8 +18,8 @@ export function AppSidebar() {
       {/* Mobile hamburger button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed top-4 left-4 z-50 p-2 rounded-lg bg-sidebar text-sidebar-foreground lg:hidden shadow-lg"
-        aria-label="Toggle menu"
+        className="fixed top-4 right-4 z-50 p-2 rounded-lg bg-sidebar text-sidebar-foreground lg:hidden shadow-lg"
+        aria-label="פתח תפריט"
       >
         {isOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
       </button>
@@ -34,8 +35,8 @@ export function AppSidebar() {
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed lg:sticky top-0 left-0 z-40 h-screen w-64 bg-sidebar text-sidebar-foreground flex flex-col transition-transform duration-300 ease-in-out",
-          isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+          "fixed lg:sticky top-0 right-0 z-40 h-screen w-64 bg-sidebar text-sidebar-foreground flex flex-col transition-transform duration-300 ease-in-out",
+          isOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"
         )}
       >
         {/* Logo */}
@@ -45,8 +46,8 @@ export function AppSidebar() {
               <Link2 className="h-5 w-5 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="font-semibold text-lg">LinkFlow</h1>
-              <p className="text-xs text-sidebar-foreground/60">Attribution Manager</p>
+              <h1 className="font-semibold text-lg">לינקפלו</h1>
+              <p className="text-xs text-sidebar-foreground/60">ניהול קמפיינים</p>
             </div>
           </div>
         </div>
@@ -71,7 +72,7 @@ export function AppSidebar() {
         {/* Footer */}
         <div className="p-4 border-t border-sidebar-border">
           <div className="px-4 py-3 rounded-lg bg-sidebar-accent/50">
-            <p className="text-xs text-sidebar-foreground/60">Powered by</p>
+            <p className="text-xs text-sidebar-foreground/60">מופעל על ידי</p>
             <p className="text-sm font-medium">Dub.co</p>
           </div>
         </div>
