@@ -25,10 +25,10 @@ export function GeneratedBlock({
     try {
       await navigator.clipboard.writeText(fullText);
       setCopied(true);
-      toast.success(`Copied ${channelName} block!`);
+      toast.success(`הועתק בלוק ${channelName}!`);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      toast.error("Failed to copy");
+      toast.error("ההעתקה נכשלה");
     }
   };
 
@@ -52,7 +52,7 @@ export function GeneratedBlock({
           rel="noopener noreferrer"
           className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1"
         >
-          Preview <ExternalLink className="h-3 w-3" />
+          תצוגה מקדימה <ExternalLink className="h-3 w-3" />
         </a>
       </div>
 
@@ -61,7 +61,7 @@ export function GeneratedBlock({
         <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
           {adCopy}
         </p>
-        <p className="text-sm text-primary font-medium mt-2">{shortLink}</p>
+        <p className="text-sm text-primary font-medium mt-2" dir="ltr">{shortLink}</p>
       </div>
 
       {/* Copy button */}
@@ -76,12 +76,12 @@ export function GeneratedBlock({
         {copied ? (
           <>
             <Check className="h-4 w-4" />
-            Copied!
+            הועתק!
           </>
         ) : (
           <>
             <Copy className="h-4 w-4" />
-            Copy to Clipboard
+            העתק ללוח
           </>
         )}
       </button>

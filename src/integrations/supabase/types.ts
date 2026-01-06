@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      campaigns: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       channels: {
         Row: {
           color: string | null
@@ -41,6 +65,7 @@ export type Database = {
       generated_links: {
         Row: {
           ad_copy: string
+          campaign_id: string | null
           channel_id: string | null
           clicks: number | null
           created_at: string
@@ -51,6 +76,7 @@ export type Database = {
         }
         Insert: {
           ad_copy: string
+          campaign_id?: string | null
           channel_id?: string | null
           clicks?: number | null
           created_at?: string
@@ -61,6 +87,7 @@ export type Database = {
         }
         Update: {
           ad_copy?: string
+          campaign_id?: string | null
           channel_id?: string | null
           clicks?: number | null
           created_at?: string
@@ -70,6 +97,13 @@ export type Database = {
           short_link?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "generated_links_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "generated_links_channel_id_fkey"
             columns: ["channel_id"]

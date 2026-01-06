@@ -7,6 +7,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import Generator from "./pages/Generator";
 import Analytics from "./pages/Analytics";
 import Settings from "./pages/Settings";
+import Campaigns from "./pages/Campaigns";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -17,11 +18,12 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <div className="min-h-screen flex w-full bg-background">
+        <div className="min-h-screen flex w-full bg-background" dir="rtl">
           <AppSidebar />
           <main className="flex-1 w-full">
             <Routes>
               <Route path="/" element={<Generator />} />
+              <Route path="/campaigns" element={<Campaigns />} />
               <Route path="/analytics" element={<Analytics />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="*" element={<NotFound />} />
