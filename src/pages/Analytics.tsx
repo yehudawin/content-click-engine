@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { BarChart3, ExternalLink, TrendingUp, Link2, RefreshCw, FolderKanban } from "lucide-react";
+import { useState, useMemo } from "react";
+import { BarChart3, ExternalLink, TrendingUp, Link2, RefreshCw, FolderKanban, ArrowUp, ArrowDown, Minus, Calendar, Download } from "lucide-react";
 import { useGeneratedLinks, useUpdateLinkClicks, LinksFilter } from "@/hooks/useGeneratedLinks";
 import { useSyncAnalytics } from "@/hooks/useDubApi";
 import { AnalyticsFilters } from "@/components/AnalyticsFilters";
@@ -13,9 +13,14 @@ import {
   Tooltip,
   ResponsiveContainer,
   Cell,
-  PieChart,
-  Pie,
+  LineChart,
+  Line,
+  Legend,
+  AreaChart,
+  Area,
 } from "recharts";
+import { format, parseISO, startOfDay, eachDayOfInterval, subDays } from "date-fns";
+import { he } from "date-fns/locale";
 
 export default function Analytics() {
   const [filters, setFilters] = useState<LinksFilter>({});
@@ -58,106 +63,253 @@ export default function Analytics() {
   };
 
   // Aggregate clicks by channel
-  const channelStats = links?.reduce((acc, link) => {
-    const channelName = link.channels?.name || "לא ידוע";
-    const color = link.channels?.color || "#6366f1";
-    
-    if (!acc[channelName]) {
-      acc[channelName] = { name: channelName, clicks: 0, count: 0, color };
-    }
-    acc[channelName].clicks += link.clicks || 0;
-    acc[channelName].count += 1;
-    return acc;
-  }, {} as Record<string, { name: string; clicks: number; count: number; color: string }>);
+  const channelStats = useMemo(() => {
+    return links?.reduce((acc, link) => {
+      const channelName = link.channels?.name || "לא ידוע";
+      const color = link.channels?.color || "#6366f1";
+      
+      if (!acc[channelName]) {
+        acc[channelName] = { name: channelName, clicks: 0, count: 0, color };
+      }
+      acc[channelName].clicks += link.clicks || 0;
+      acc[channelName].count += 1;
+      return acc;
+    }, {} as Record<string, { name: string; clicks: number; count: number; color: string }>);
+  }, [links]);
 
   // Aggregate by campaign
-  const campaignStats = links?.reduce((acc, link) => {
-    const campaignName = link.campaigns?.name || "ללא קמפיין";
-    
-    if (!acc[campaignName]) {
-      acc[campaignName] = { name: campaignName, clicks: 0, count: 0 };
-    }
-    acc[campaignName].clicks += link.clicks || 0;
-    acc[campaignName].count += 1;
-    return acc;
-  }, {} as Record<string, { name: string; clicks: number; count: number }>);
+  const campaignStats = useMemo(() => {
+    return links?.reduce((acc, link) => {
+      const campaignName = link.campaigns?.name || "ללא קמפיין";
+      
+      if (!acc[campaignName]) {
+        acc[campaignName] = { name: campaignName, clicks: 0, count: 0 };
+      }
+      acc[campaignName].clicks += link.clicks || 0;
+      acc[campaignName].count += 1;
+      return acc;
+    }, {} as Record<string, { name: string; clicks: number; count: number }>);
+  }, [links]);
 
-  const chartData = Object.values(channelStats || {});
-  const campaignData = Object.values(campaignStats || {});
+  // Time-based data (clicks over time)
+  const timeSeriesData = useMemo(() => {
+    if (!links || links.length === 0) return [];
+
+    // Get date range (last 30 days or from filter)
+    const endDate = new Date();
+    const startDate = filters.dateFrom 
+      ? parseISO(filters.dateFrom) 
+      : subDays(endDate, 30);
+    
+    const days = eachDayOfInterval({ start: startDate, end: endDate });
+    
+    // Group links by creation date
+    const linksByDate = links.reduce((acc, link) => {
+      const date = format(parseISO(link.created_at), "yyyy-MM-dd");
+      if (!acc[date]) {
+        acc[date] = { links: 0, clicks: 0 };
+      }
+      acc[date].links += 1;
+      acc[date].clicks += link.clicks || 0;
+      return acc;
+    }, {} as Record<string, { links: number; clicks: number }>);
+
+    return days.map(day => {
+      const dateKey = format(day, "yyyy-MM-dd");
+      const data = linksByDate[dateKey] || { links: 0, clicks: 0 };
+      return {
+        date: format(day, "dd/MM", { locale: he }),
+        fullDate: dateKey,
+        links: data.links,
+        clicks: data.clicks,
+      };
+    });
+  }, [links, filters.dateFrom]);
+
+  // Top performing links
+  const topLinks = useMemo(() => {
+    if (!links) return [];
+    return [...links]
+      .sort((a, b) => (b.clicks || 0) - (a.clicks || 0))
+      .slice(0, 5);
+  }, [links]);
+
+  const chartData = Object.values(channelStats || {}).sort((a, b) => b.clicks - a.clicks);
+  const campaignData = Object.values(campaignStats || {}).sort((a, b) => b.clicks - a.clicks);
   const totalClicks = chartData.reduce((sum, item) => sum + item.clicks, 0);
   const totalLinks = links?.length || 0;
   const totalCampaigns = new Set(links?.map((l) => l.campaign_id).filter(Boolean)).size;
+  const avgClicksPerLink = totalLinks > 0 ? Math.round(totalClicks / totalLinks) : 0;
+
+  // Export to CSV
+  const handleExport = () => {
+    if (!links || links.length === 0) {
+      toast.error("אין נתונים לייצוא");
+      return;
+    }
+
+    const headers = ["קמפיין", "ערוץ", "לינק קצר", "URL יעד", "קליקים", "תאריך יצירה"];
+    const rows = links.map(link => [
+      link.campaigns?.name || "",
+      link.channels?.name || "",
+      link.short_link,
+      link.destination_url,
+      String(link.clicks || 0),
+      new Date(link.created_at).toLocaleDateString("he-IL"),
+    ]);
+
+    const csvContent = [headers, ...rows]
+      .map(row => row.map(cell => `"${cell}"`).join(","))
+      .join("\n");
+
+    const blob = new Blob(["\ufeff" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `analytics-${format(new Date(), "yyyy-MM-dd")}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("הקובץ הורד בהצלחה");
+  };
 
   return (
     <div className="min-h-screen lg:pr-0 pt-16 lg:pt-0">
-      <div className="max-w-6xl mx-auto p-4 lg:p-8">
+      <div className="max-w-7xl mx-auto p-4 lg:p-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>
             <h1 className="text-2xl lg:text-3xl font-bold text-foreground mb-2">
               לוח בקרה אנליטי
             </h1>
             <p className="text-muted-foreground">
-              מעקב ביצועים בכל ערוצי ההפצה
+              מעקב ביצועים מקיף בכל ערוצי ההפצה
             </p>
           </div>
-          <button
-            onClick={handleSyncClicks}
-            disabled={isSyncing || isLoading}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
-          >
-            <RefreshCw className={`h-4 w-4 ${isSyncing ? "animate-spin" : ""}`} />
-            סנכרן נתונים
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleExport}
+              disabled={isLoading || !links?.length}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-foreground font-medium hover:bg-muted disabled:opacity-50 transition-colors"
+            >
+              <Download className="h-4 w-4" />
+              ייצוא CSV
+            </button>
+            <button
+              onClick={handleSyncClicks}
+              disabled={isSyncing || isLoading}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
+            >
+              <RefreshCw className={`h-4 w-4 ${isSyncing ? "animate-spin" : ""}`} />
+              סנכרן נתונים
+            </button>
+          </div>
         </div>
 
         {/* Filters */}
         <AnalyticsFilters filters={filters} onFiltersChange={setFilters} />
 
         {/* Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-4 mb-8">
-          <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <TrendingUp className="h-5 w-5 text-primary" />
-              </div>
-              <span className="text-sm text-muted-foreground">סה״כ קליקים</span>
-            </div>
-            <p className="text-3xl font-bold text-foreground">{totalClicks.toLocaleString()}</p>
-          </div>
-
-          <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center">
-                <Link2 className="h-5 w-5 text-accent" />
-              </div>
-              <span className="text-sm text-muted-foreground">סה״כ לינקים</span>
-            </div>
-            <p className="text-3xl font-bold text-foreground">{totalLinks}</p>
-          </div>
-
-          <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-lg bg-info/10 flex items-center justify-center">
-                <BarChart3 className="h-5 w-5 text-info" />
-              </div>
-              <span className="text-sm text-muted-foreground">ערוצים פעילים</span>
-            </div>
-            <p className="text-3xl font-bold text-foreground">{chartData.length}</p>
-          </div>
-
-          <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-lg bg-warning/10 flex items-center justify-center">
-                <FolderKanban className="h-5 w-5 text-warning" />
-              </div>
-              <span className="text-sm text-muted-foreground">קמפיינים</span>
-            </div>
-            <p className="text-3xl font-bold text-foreground">{totalCampaigns}</p>
-          </div>
+        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4 mb-8">
+          <StatCard
+            icon={TrendingUp}
+            label="סה״כ קליקים"
+            value={totalClicks.toLocaleString()}
+            color="primary"
+          />
+          <StatCard
+            icon={Link2}
+            label="סה״כ לינקים"
+            value={totalLinks.toString()}
+            color="accent"
+          />
+          <StatCard
+            icon={BarChart3}
+            label="ערוצים פעילים"
+            value={chartData.length.toString()}
+            color="info"
+          />
+          <StatCard
+            icon={FolderKanban}
+            label="ממוצע קליקים ללינק"
+            value={avgClicksPerLink.toLocaleString()}
+            color="warning"
+          />
         </div>
 
-        {/* Charts */}
+        {/* Time Series Chart */}
+        <div className="bg-card rounded-xl border border-border p-4 lg:p-6 shadow-sm mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-muted-foreground" />
+              מגמת קליקים לאורך זמן
+            </h2>
+          </div>
+          
+          {isLoading ? (
+            <div className="h-72 flex items-center justify-center">
+              <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+            </div>
+          ) : timeSeriesData.length > 0 ? (
+            <div className="h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={timeSeriesData}>
+                  <defs>
+                    <linearGradient id="colorClicks" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis 
+                    dataKey="date" 
+                    stroke="hsl(var(--muted-foreground))" 
+                    fontSize={11}
+                    tickMargin={8}
+                  />
+                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "8px",
+                      direction: "rtl",
+                    }}
+                    formatter={(value: number, name: string) => [
+                      value.toLocaleString(), 
+                      name === "clicks" ? "קליקים" : "לינקים חדשים"
+                    ]}
+                    labelFormatter={(label) => `תאריך: ${label}`}
+                  />
+                  <Legend 
+                    formatter={(value) => value === "clicks" ? "קליקים" : "לינקים חדשים"}
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="clicks" 
+                    stroke="hsl(var(--primary))" 
+                    strokeWidth={2}
+                    fillOpacity={1} 
+                    fill="url(#colorClicks)" 
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="links" 
+                    stroke="hsl(var(--accent))" 
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="h-72 flex flex-col items-center justify-center text-muted-foreground">
+              <Calendar className="h-12 w-12 mb-3 opacity-50" />
+              <p>אין נתונים עדיין</p>
+            </div>
+          )}
+        </div>
+
+        {/* Charts Grid */}
         <div className="grid gap-6 lg:grid-cols-2 mb-8">
           {/* Channel Chart */}
           <div className="bg-card rounded-xl border border-border p-4 lg:p-6 shadow-sm">
@@ -181,14 +333,19 @@ export default function Analytics() {
                       stroke="hsl(var(--muted-foreground))"
                       fontSize={12}
                       width={100}
+                      tickFormatter={(value) => value.length > 12 ? `${value.slice(0, 12)}...` : value}
                     />
                     <Tooltip
                       contentStyle={{
                         backgroundColor: "hsl(var(--card))",
                         border: "1px solid hsl(var(--border))",
                         borderRadius: "8px",
+                        direction: "rtl",
                       }}
-                      formatter={(value: number) => [value.toLocaleString(), "קליקים"]}
+                      formatter={(value: number, name: string, props: any) => [
+                        `${value.toLocaleString()} קליקים (${props.payload.count} לינקים)`,
+                        ""
+                      ]}
                     />
                     <Bar dataKey="clicks" radius={[0, 4, 4, 0]}>
                       {chartData.map((entry, index) => (
@@ -201,7 +358,7 @@ export default function Analytics() {
             ) : (
               <div className="h-64 flex flex-col items-center justify-center text-muted-foreground">
                 <BarChart3 className="h-12 w-12 mb-3 opacity-50" />
-                <p>אין נתונים עדיין. צרו לינקים כדי לראות אנליטיקס!</p>
+                <p>אין נתונים עדיין</p>
               </div>
             )}
           </div>
@@ -219,17 +376,29 @@ export default function Analytics() {
             ) : campaignData.length > 0 ? (
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={campaignData}>
+                  <BarChart data={campaignData.slice(0, 8)}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                    <XAxis 
+                      dataKey="name" 
+                      stroke="hsl(var(--muted-foreground))" 
+                      fontSize={11}
+                      tickFormatter={(value) => value.length > 10 ? `${value.slice(0, 10)}...` : value}
+                      angle={-45}
+                      textAnchor="end"
+                      height={60}
+                    />
                     <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
                     <Tooltip
                       contentStyle={{
                         backgroundColor: "hsl(var(--card))",
                         border: "1px solid hsl(var(--border))",
                         borderRadius: "8px",
+                        direction: "rtl",
                       }}
-                      formatter={(value: number) => [value.toLocaleString(), "קליקים"]}
+                      formatter={(value: number, name: string, props: any) => [
+                        `${value.toLocaleString()} קליקים (${props.payload.count} לינקים)`,
+                        ""
+                      ]}
                     />
                     <Bar dataKey="clicks" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
                   </BarChart>
@@ -244,10 +413,73 @@ export default function Analytics() {
           </div>
         </div>
 
-        {/* Links Table */}
-        <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+        {/* Top Performing Links */}
+        <div className="bg-card rounded-xl border border-border shadow-sm mb-8">
           <div className="p-4 lg:p-6 border-b border-border">
-            <h2 className="text-lg font-semibold text-foreground">לינקים אחרונים</h2>
+            <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-accent" />
+              הלינקים המובילים
+            </h2>
+          </div>
+
+          {isLoading ? (
+            <div className="p-8 flex justify-center">
+              <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+            </div>
+          ) : topLinks.length > 0 ? (
+            <div className="divide-y divide-border">
+              {topLinks.map((link, index) => (
+                <div key={link.id} className="p-4 lg:px-6 flex items-center gap-4">
+                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
+                    {index + 1}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span
+                        className="w-3 h-3 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: link.channels?.color || "#6366f1" }}
+                      />
+                      <span className="font-medium text-sm truncate">{link.channels?.name}</span>
+                      {link.campaigns?.name && (
+                        <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
+                          {link.campaigns.name}
+                        </span>
+                      )}
+                    </div>
+                    <a
+                      href={link.short_link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline flex items-center gap-1 text-sm"
+                      dir="ltr"
+                    >
+                      {link.short_link}
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+                  <div className="text-left">
+                    <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold bg-accent/10 text-accent">
+                      {(link.clicks || 0).toLocaleString()} קליקים
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="p-8 text-center text-muted-foreground">
+              <Link2 className="h-12 w-12 mx-auto mb-3 opacity-50" />
+              <p>אין לינקים עדיין</p>
+            </div>
+          )}
+        </div>
+
+        {/* All Links Table */}
+        <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+          <div className="p-4 lg:p-6 border-b border-border flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-foreground">כל הלינקים</h2>
+            <span className="text-sm text-muted-foreground">
+              {totalLinks} לינקים
+            </span>
           </div>
 
           {isLoading ? (
@@ -277,7 +509,7 @@ export default function Analytics() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {links.slice(0, 15).map((link) => (
+                  {links.slice(0, 20).map((link) => (
                     <tr key={link.id} className="hover:bg-muted/30 transition-colors">
                       <td className="px-4 lg:px-6 py-4">
                         <span className="text-sm text-muted-foreground">
@@ -326,6 +558,35 @@ export default function Analytics() {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// Stat Card Component
+interface StatCardProps {
+  icon: React.ElementType;
+  label: string;
+  value: string;
+  color: "primary" | "accent" | "info" | "warning";
+}
+
+function StatCard({ icon: Icon, label, value, color }: StatCardProps) {
+  const colorClasses = {
+    primary: "bg-primary/10 text-primary",
+    accent: "bg-accent/10 text-accent",
+    info: "bg-info/10 text-info",
+    warning: "bg-warning/10 text-warning",
+  };
+
+  return (
+    <div className="bg-card rounded-xl border border-border p-4 lg:p-5 shadow-sm">
+      <div className="flex items-center gap-3 mb-3">
+        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${colorClasses[color]}`}>
+          <Icon className="h-5 w-5" />
+        </div>
+        <span className="text-sm text-muted-foreground">{label}</span>
+      </div>
+      <p className="text-2xl lg:text-3xl font-bold text-foreground">{value}</p>
     </div>
   );
 }
