@@ -1,6 +1,4 @@
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+/// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -9,6 +7,8 @@ const corsHeaders = {
 
 const DUB_API_KEY = Deno.env.get('DUB_API_KEY');
 const DUB_WORKSPACE_ID = Deno.env.get('DUB_WORKSPACE_ID');
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY');
 
 // Input validation schemas
 const VALID_ACTIONS = ['create-link', 'get-links', 'get-analytics', 'get-bulk-analytics'] as const;
@@ -39,7 +39,36 @@ function isValidLinkIds(linkIds: unknown): boolean {
   return Array.isArray(linkIds) && linkIds.length <= 100 && linkIds.every(id => isValidLinkId(id));
 }
 
-serve(async (req) => {
+async function verifyAuth(req: Request): Promise<{ userId: string } | null> {
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader?.startsWith('Bearer ')) {
+    return null;
+  }
+
+  const token = authHeader.replace('Bearer ', '');
+  
+  try {
+    // Verify the token by calling Supabase auth API
+    const response = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'apikey': SUPABASE_ANON_KEY!,
+      },
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const user = await response.json();
+    return { userId: user.id };
+  } catch (error) {
+    console.error('Auth verification failed:', error);
+    return null;
+  }
+}
+
+Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -47,34 +76,16 @@ serve(async (req) => {
 
   try {
     // Authentication check
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      console.error('Missing or invalid authorization header');
+    const authResult = await verifyAuth(req);
+    if (!authResult) {
+      console.error('Authentication failed');
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_ANON_KEY')!,
-      { global: { headers: { Authorization: authHeader } } }
-    );
-
-    const token = authHeader.replace('Bearer ', '');
-    const { data: claimsData, error: claimsError } = await supabaseClient.auth.getClaims(token);
-    
-    if (claimsError || !claimsData?.claims) {
-      console.error('Authentication failed:', claimsError);
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const userId = claimsData.claims.sub;
-    console.log(`Authenticated user: ${userId}`);
+    console.log(`Authenticated user: ${authResult.userId}`);
 
     const { action, payload } = await req.json();
     
@@ -231,7 +242,7 @@ serve(async (req) => {
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('Error in dub-proxy function:', error);
+    console.error('Error in dub-proxy function:', errorMessage);
     return new Response(
       JSON.stringify({ error: 'Internal server error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
