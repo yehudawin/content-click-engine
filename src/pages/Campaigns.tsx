@@ -3,6 +3,7 @@ import { Plus, Trash2, Loader2, FolderKanban, Link2, TrendingUp } from "lucide-r
 import { toast } from "sonner";
 import { useCampaigns, useCreateCampaign, useDeleteCampaign } from "@/hooks/useCampaigns";
 import { useGeneratedLinks } from "@/hooks/useGeneratedLinks";
+import { CampaignSchema } from "@/lib/validation";
 
 export default function Campaigns() {
   const [newCampaignName, setNewCampaignName] = useState("");
@@ -21,21 +22,28 @@ export default function Campaigns() {
 
   const handleAddCampaign = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newCampaignName.trim()) {
-      toast.error("נא להזין שם קמפיין");
+    
+    // Validate input before submission
+    const result = CampaignSchema.safeParse({
+      name: newCampaignName.trim(),
+      description: newCampaignDescription.trim() || undefined,
+    });
+
+    if (!result.success) {
+      toast.error(result.error.errors[0]?.message || "קלט לא תקין");
       return;
     }
 
     try {
       await createCampaign.mutateAsync({
-        name: newCampaignName.trim(),
-        description: newCampaignDescription.trim() || undefined,
+        name: result.data.name,
+        description: result.data.description,
       });
       toast.success("הקמפיין נוצר בהצלחה!");
       setNewCampaignName("");
       setNewCampaignDescription("");
     } catch (error: any) {
-      toast.error("יצירת הקמפיין נכשלה");
+      toast.error(error.message || "יצירת הקמפיין נכשלה");
     }
   };
 
@@ -81,8 +89,12 @@ export default function Campaigns() {
                 value={newCampaignName}
                 onChange={(e) => setNewCampaignName(e.target.value)}
                 placeholder="לדוגמה: השקת מוצר חדש, קמפיין חגים..."
+                maxLength={100}
                 className="w-full px-4 py-3 rounded-lg border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors"
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                {newCampaignName.length}/100 תווים
+              </p>
             </div>
 
             <div>
@@ -94,8 +106,12 @@ export default function Campaigns() {
                 onChange={(e) => setNewCampaignDescription(e.target.value)}
                 placeholder="תיאור קצר של הקמפיין..."
                 rows={2}
+                maxLength={500}
                 className="w-full px-4 py-3 rounded-lg border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors resize-none"
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                {newCampaignDescription.length}/500 תווים
+              </p>
             </div>
 
             <button

@@ -7,6 +7,7 @@ import { GeneratedBlock } from "@/components/GeneratedBlock";
 import { useChannels } from "@/hooks/useChannels";
 import { useCreateDubLink } from "@/hooks/useDubApi";
 import { useCreateGeneratedLink } from "@/hooks/useGeneratedLinks";
+import { LinkGenerationSchema } from "@/lib/validation";
 
 interface GeneratedBlockData {
   channelId: string;
@@ -29,16 +30,19 @@ export default function Generator() {
   const createGeneratedLink = useCreateGeneratedLink();
 
   const handleGenerate = async () => {
-    if (!adCopy.trim()) {
-      toast.error("נא להזין טקסט פרסומי");
+    // Validate inputs
+    const result = LinkGenerationSchema.safeParse({
+      destinationUrl: destinationUrl.trim(),
+      adCopy: adCopy.trim(),
+    });
+
+    if (!result.success) {
+      toast.error(result.error.errors[0]?.message || "קלט לא תקין");
       return;
     }
+
     if (selectedChannels.length === 0) {
       toast.error("נא לבחור לפחות ערוץ אחד");
-      return;
-    }
-    if (!destinationUrl.trim()) {
-      toast.error("נא להזין כתובת יעד");
       return;
     }
 
@@ -53,7 +57,7 @@ export default function Generator() {
 
       try {
         // Build URL with UTM parameters
-        const url = new URL(destinationUrl);
+        const url = new URL(result.data.destinationUrl);
         url.searchParams.set("utm_source", channel.name.toLowerCase().replace(/\s+/g, "_"));
         url.searchParams.set("utm_medium", "social");
         url.searchParams.set("utm_campaign", selectedCampaign ? "campaign" : "general");
@@ -70,7 +74,7 @@ export default function Generator() {
           campaign_id: selectedCampaign || undefined,
           short_link: dubLink.shortLink,
           destination_url: url.toString(),
-          ad_copy: adCopy,
+          ad_copy: result.data.adCopy,
           dub_link_id: dubLink.id,
         });
 
@@ -78,7 +82,7 @@ export default function Generator() {
           channelId,
           channelName: channel.name,
           channelColor: channel.color,
-          adCopy,
+          adCopy: result.data.adCopy,
           shortLink: dubLink.shortLink,
         });
 
@@ -156,10 +160,11 @@ export default function Generator() {
                 onChange={(e) => setAdCopy(e.target.value)}
                 placeholder="הזינו כאן את הטקסט הפרסומי שלכם..."
                 rows={5}
+                maxLength={5000}
                 className="w-full px-4 py-3 rounded-lg border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors resize-none"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                {adCopy.length} תווים
+                {adCopy.length}/5000 תווים
               </p>
             </div>
 

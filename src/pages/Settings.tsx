@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Plus, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useChannels, useCreateChannel, useDeleteChannel } from "@/hooks/useChannels";
+import { ChannelSchema } from "@/lib/validation";
 
 const PRESET_COLORS = [
   "#6366f1",
@@ -24,15 +25,22 @@ export default function Settings() {
 
   const handleAddChannel = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newChannelName.trim()) {
-      toast.error("נא להזין שם ערוץ");
+    
+    // Validate input before submission
+    const result = ChannelSchema.safeParse({
+      name: newChannelName.trim(),
+      color: newChannelColor,
+    });
+
+    if (!result.success) {
+      toast.error(result.error.errors[0]?.message || "קלט לא תקין");
       return;
     }
 
     try {
       await createChannel.mutateAsync({
-        name: newChannelName.trim(),
-        color: newChannelColor,
+        name: result.data.name,
+        color: result.data.color,
       });
       toast.success("הערוץ נוסף בהצלחה!");
       setNewChannelName("");
@@ -40,7 +48,7 @@ export default function Settings() {
       if (error.message?.includes("duplicate")) {
         toast.error("ערוץ זה כבר קיים");
       } else {
-        toast.error("הוספת הערוץ נכשלה");
+        toast.error(error.message || "הוספת הערוץ נכשלה");
       }
     }
   };
@@ -87,8 +95,12 @@ export default function Settings() {
                 value={newChannelName}
                 onChange={(e) => setNewChannelName(e.target.value)}
                 placeholder="לדוגמה: Instagram, LinkedIn..."
+                maxLength={50}
                 className="w-full px-4 py-3 rounded-lg border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors"
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                {newChannelName.length}/50 תווים
+              </p>
             </div>
 
             <div>
