@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { CampaignSchema } from "@/lib/validation";
 
 export interface Campaign {
   id: string;
@@ -29,9 +30,18 @@ export function useCreateCampaign() {
 
   return useMutation({
     mutationFn: async (campaign: { name: string; description?: string }) => {
+      // Validate input before sending to database
+      const result = CampaignSchema.safeParse(campaign);
+      if (!result.success) {
+        throw new Error(result.error.errors[0]?.message || "קלט לא תקין");
+      }
+
       const { data, error } = await supabase
         .from("campaigns")
-        .insert(campaign)
+        .insert({
+          name: result.data.name,
+          description: result.data.description ?? null,
+        })
         .select()
         .single();
 

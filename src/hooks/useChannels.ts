@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { ChannelSchema } from "@/lib/validation";
 
 export interface Channel {
   id: string;
@@ -29,9 +30,19 @@ export function useCreateChannel() {
 
   return useMutation({
     mutationFn: async (channel: { name: string; description?: string; color?: string }) => {
+      // Validate input before sending to database
+      const result = ChannelSchema.safeParse(channel);
+      if (!result.success) {
+        throw new Error(result.error.errors[0]?.message || "קלט לא תקין");
+      }
+
       const { data, error } = await supabase
         .from("channels")
-        .insert(channel)
+        .insert({
+          name: result.data.name,
+          description: result.data.description ?? null,
+          color: result.data.color,
+        })
         .select()
         .single();
 

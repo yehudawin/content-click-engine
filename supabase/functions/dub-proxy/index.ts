@@ -1,5 +1,6 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -9,6 +10,35 @@ const corsHeaders = {
 const DUB_API_KEY = Deno.env.get('DUB_API_KEY');
 const DUB_WORKSPACE_ID = Deno.env.get('DUB_WORKSPACE_ID');
 
+// Input validation schemas
+const VALID_ACTIONS = ['create-link', 'get-links', 'get-analytics', 'get-bulk-analytics'] as const;
+
+function isValidAction(action: unknown): action is typeof VALID_ACTIONS[number] {
+  return typeof action === 'string' && VALID_ACTIONS.includes(action as typeof VALID_ACTIONS[number]);
+}
+
+function isValidUrl(url: unknown): boolean {
+  if (typeof url !== 'string') return false;
+  try {
+    new URL(url);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function isValidTags(tags: unknown): tags is string[] {
+  return Array.isArray(tags) && tags.every(tag => typeof tag === 'string' && tag.length <= 100);
+}
+
+function isValidLinkId(linkId: unknown): boolean {
+  return typeof linkId === 'string' && linkId.length > 0 && linkId.length <= 100;
+}
+
+function isValidLinkIds(linkIds: unknown): boolean {
+  return Array.isArray(linkIds) && linkIds.length <= 100 && linkIds.every(id => isValidLinkId(id));
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -16,7 +46,47 @@ serve(async (req) => {
   }
 
   try {
+    // Authentication check
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      console.error('Missing or invalid authorization header');
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await supabaseClient.auth.getClaims(token);
+    
+    if (claimsError || !claimsData?.claims) {
+      console.error('Authentication failed:', claimsError);
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const userId = claimsData.claims.sub;
+    console.log(`Authenticated user: ${userId}`);
+
     const { action, payload } = await req.json();
+    
+    // Validate action
+    if (!isValidAction(action)) {
+      console.error('Invalid action:', action);
+      return new Response(
+        JSON.stringify({ error: 'Invalid action' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     console.log(`Dub proxy action: ${action}`, payload);
 
     if (!DUB_API_KEY || !DUB_WORKSPACE_ID) {
@@ -37,7 +107,24 @@ serve(async (req) => {
 
     switch (action) {
       case 'create-link': {
-        const { url, tags } = payload;
+        const { url, tags } = payload || {};
+        
+        // Validate URL
+        if (!isValidUrl(url)) {
+          return new Response(
+            JSON.stringify({ error: 'Invalid URL provided' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        
+        // Validate tags
+        if (tags !== undefined && !isValidTags(tags)) {
+          return new Response(
+            JSON.stringify({ error: 'Invalid tags provided' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
         console.log('Creating link:', { url, tags });
         
         response = await fetch(`${baseUrl}/links?workspaceId=${DUB_WORKSPACE_ID}`, {
@@ -45,7 +132,7 @@ serve(async (req) => {
           headers,
           body: JSON.stringify({
             url,
-            tags,
+            tags: tags || [],
           }),
         });
         break;
@@ -61,9 +148,17 @@ serve(async (req) => {
       }
 
       case 'get-analytics': {
-        const { linkId } = payload;
+        const { linkId } = payload || {};
+        
+        if (!isValidLinkId(linkId)) {
+          return new Response(
+            JSON.stringify({ error: 'Invalid link ID' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
         console.log('Fetching analytics for link:', linkId);
-        response = await fetch(`${baseUrl}/analytics?workspaceId=${DUB_WORKSPACE_ID}&linkId=${linkId}&event=clicks`, {
+        response = await fetch(`${baseUrl}/analytics?workspaceId=${DUB_WORKSPACE_ID}&linkId=${encodeURIComponent(linkId)}&event=clicks`, {
           method: 'GET',
           headers,
         });
@@ -71,7 +166,15 @@ serve(async (req) => {
       }
 
       case 'get-bulk-analytics': {
-        const { linkIds } = payload;
+        const { linkIds } = payload || {};
+        
+        if (!isValidLinkIds(linkIds)) {
+          return new Response(
+            JSON.stringify({ error: 'Invalid link IDs' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
         console.log('Fetching bulk analytics for links:', linkIds);
         
         // Fetch analytics for each link
@@ -80,7 +183,7 @@ serve(async (req) => {
         for (const linkId of linkIds) {
           try {
             const analyticsResponse = await fetch(
-              `${baseUrl}/analytics?workspaceId=${DUB_WORKSPACE_ID}&linkId=${linkId}&event=clicks`,
+              `${baseUrl}/analytics?workspaceId=${DUB_WORKSPACE_ID}&linkId=${encodeURIComponent(linkId)}&event=clicks`,
               { method: 'GET', headers }
             );
             
@@ -116,7 +219,7 @@ serve(async (req) => {
     if (!response.ok) {
       console.error('Dub API error:', data);
       return new Response(
-        JSON.stringify({ error: data.error || 'Dub API error', details: data }),
+        JSON.stringify({ error: 'Dub API error' }),
         { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -130,7 +233,7 @@ serve(async (req) => {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('Error in dub-proxy function:', error);
     return new Response(
-      JSON.stringify({ error: errorMessage }),
+      JSON.stringify({ error: 'Internal server error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

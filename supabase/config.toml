@@ -1,1 +1,4 @@
 project_id = "tevrmffekrlrwxmlxxgb"
+
+[functions.dub-proxy]
+verify_jwt = false
