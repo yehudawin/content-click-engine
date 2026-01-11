@@ -21,6 +21,7 @@ export type Database = {
           id: string
           name: string
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string
@@ -28,6 +29,7 @@ export type Database = {
           id?: string
           name: string
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string
@@ -35,6 +37,7 @@ export type Database = {
           id?: string
           name?: string
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -45,6 +48,7 @@ export type Database = {
           description: string | null
           id: string
           name: string
+          user_id: string | null
         }
         Insert: {
           color?: string | null
@@ -52,6 +56,7 @@ export type Database = {
           description?: string | null
           id?: string
           name: string
+          user_id?: string | null
         }
         Update: {
           color?: string | null
@@ -59,6 +64,7 @@ export type Database = {
           description?: string | null
           id?: string
           name?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -73,6 +79,7 @@ export type Database = {
           dub_link_id: string | null
           id: string
           short_link: string
+          user_id: string | null
         }
         Insert: {
           ad_copy: string
@@ -84,6 +91,7 @@ export type Database = {
           dub_link_id?: string | null
           id?: string
           short_link: string
+          user_id?: string | null
         }
         Update: {
           ad_copy?: string
@@ -95,6 +103,7 @@ export type Database = {
           dub_link_id?: string | null
           id?: string
           short_link?: string
+          user_id?: string | null
         }
         Relationships: [
           {
