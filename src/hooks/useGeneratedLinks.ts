@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "./useAuth";
 
 export interface GeneratedLink {
   id: string;
@@ -10,6 +11,7 @@ export interface GeneratedLink {
   ad_copy: string;
   dub_link_id: string | null;
   clicks: number;
+  user_id: string;
   created_at: string;
   channels?: {
     name: string;
@@ -68,6 +70,7 @@ export function useGeneratedLinks(filter?: LinksFilter) {
 
 export function useCreateGeneratedLink() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   return useMutation({
     mutationFn: async (link: {
@@ -78,9 +81,14 @@ export function useCreateGeneratedLink() {
       ad_copy: string;
       dub_link_id?: string;
     }) => {
+      if (!user) throw new Error("יש להתחבר כדי ליצור קישור");
+      
       const { data, error } = await supabase
         .from("generated_links")
-        .insert(link)
+        .insert({
+          ...link,
+          user_id: user.id,
+        })
         .select()
         .single();
 
