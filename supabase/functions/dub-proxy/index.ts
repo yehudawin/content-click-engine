@@ -169,7 +169,7 @@ Deno.serve(async (req) => {
         }
 
         console.log('Fetching analytics for link:', linkId);
-        response = await fetch(`${baseUrl}/analytics?workspaceId=${DUB_WORKSPACE_ID}&linkId=${encodeURIComponent(linkId)}&event=clicks`, {
+        response = await fetch(`${baseUrl}/analytics?workspaceId=${DUB_WORKSPACE_ID}&linkId=${encodeURIComponent(linkId)}&event=clicks&interval=all`, {
           method: 'GET',
           headers,
         });
@@ -194,7 +194,7 @@ Deno.serve(async (req) => {
         for (const linkId of linkIds) {
           try {
             const analyticsResponse = await fetch(
-              `${baseUrl}/analytics?workspaceId=${DUB_WORKSPACE_ID}&linkId=${encodeURIComponent(linkId)}&event=clicks`,
+              `${baseUrl}/analytics?workspaceId=${DUB_WORKSPACE_ID}&linkId=${encodeURIComponent(linkId)}&event=clicks&interval=all`,
               { method: 'GET', headers }
             );
             
