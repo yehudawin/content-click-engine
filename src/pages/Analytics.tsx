@@ -15,6 +15,7 @@ import {
 import { useGeneratedLinks, useUpdateLinkClicks, LinksFilter } from "@/hooks/useGeneratedLinks";
 import { useSyncAnalytics } from "@/hooks/useDubApi";
 import { AnalyticsFilters } from "@/components/AnalyticsFilters";
+import { CampaignChannelMatrix } from "@/components/CampaignChannelMatrix";
 import { toast } from "sonner";
 import {
   BarChart,
@@ -33,6 +34,7 @@ import {
 } from "recharts";
 import { format, parseISO, startOfDay, eachDayOfInterval, subDays } from "date-fns";
 import { he } from "date-fns/locale";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function Analytics() {
   const [filters, setFilters] = useState<LinksFilter>({});
@@ -391,6 +393,13 @@ export default function Analytics() {
             )}
           </div>
         </div>
+
+        {/* Campaign-Channel Matrix */}
+        {links && links.length > 0 && (
+          <div className="mb-8">
+            <CampaignChannelMatrix links={links} />
+          </div>
+        )}
 
         {/* Top Performing Links */}
         <div className="bg-card rounded-xl border border-border shadow-sm mb-8">
