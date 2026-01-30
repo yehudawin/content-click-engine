@@ -53,20 +53,51 @@ export function useGetDubLinks() {
   });
 }
 
+interface SyncAnalyticsParams {
+  linkIds: string[];
+  startDate?: string;
+  endDate?: string;
+}
+
+interface BulkAnalyticsResponse {
+  data: Record<string, number>;
+  errors?: Record<string, string>;
+  meta: {
+    requestId: string;
+    timestamp: string;
+    totalLinks: number;
+    successCount: number;
+    errorCount: number;
+    dateRange: { start: string; end: string } | 'all-time';
+  };
+}
+
 export function useSyncAnalytics() {
   return useMutation({
-    mutationFn: async (linkIds: string[]): Promise<Record<string, number>> => {
+    mutationFn: async (params: SyncAnalyticsParams): Promise<BulkAnalyticsResponse> => {
+      const { linkIds, startDate, endDate } = params;
+      
+      console.log(`[Sync] Starting sync for ${linkIds.length} links`, { startDate, endDate });
+      
       const { data, error } = await supabase.functions.invoke("dub-proxy", {
         body: {
           action: "get-bulk-analytics",
-          payload: { linkIds },
+          payload: { linkIds, startDate, endDate },
         },
       });
 
-      if (error) throw error;
-      if (data.error) throw new Error(data.error);
+      if (error) {
+        console.error('[Sync] Edge function error:', error);
+        throw error;
+      }
+      if (data.error) {
+        console.error('[Sync] API error:', data.error);
+        throw new Error(data.error);
+      }
       
-      return data;
+      console.log(`[Sync] Complete:`, data.meta);
+      
+      return data as BulkAnalyticsResponse;
     },
   });
 }
