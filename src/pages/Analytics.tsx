@@ -55,20 +55,53 @@ export default function Analytics() {
     }
 
     setIsSyncing(true);
+    const syncStartTime = Date.now();
+    
     try {
       const dubLinkIds = linksWithDubId.map((l) => l.dub_link_id!);
-      const clicksData = await syncAnalytics.mutateAsync(dubLinkIds);
+      
+      // Build date params if filters are set
+      const syncParams = {
+        linkIds: dubLinkIds,
+        startDate: filters.dateFrom ? `${filters.dateFrom}T00:00:00Z` : undefined,
+        endDate: filters.dateTo ? `${filters.dateTo}T23:59:59Z` : undefined,
+      };
+      
+      console.log('[Sync] Starting with params:', syncParams);
+      
+      const result = await syncAnalytics.mutateAsync(syncParams);
+      
+      console.log('[Sync] Response:', {
+        successCount: result.meta.successCount,
+        errorCount: result.meta.errorCount,
+        requestId: result.meta.requestId,
+      });
 
-      // Update each link's clicks in the database
-      for (const link of linksWithDubId) {
-        const newClicks = clicksData[link.dub_link_id!] || 0;
-        if (newClicks !== link.clicks) {
-          await updateClicks.mutateAsync({ id: link.id, clicks: newClicks });
-        }
-      }
-
+      // Update clicks in database - batch updates
+      const updatePromises = linksWithDubId
+        .filter(link => {
+          const newClicks = result.data[link.dub_link_id!];
+          // Only update if we got valid data (not undefined) and it's different
+          return newClicks !== undefined && newClicks >= 0 && newClicks !== link.clicks;
+        })
+        .map(link => 
+          updateClicks.mutateAsync({ 
+            id: link.id, 
+            clicks: result.data[link.dub_link_id!] 
+          })
+        );
+      
+      await Promise.all(updatePromises);
+      
+      const duration = ((Date.now() - syncStartTime) / 1000).toFixed(1);
+      
       await refetch();
-      toast.success("הנתונים סונכרנו בהצלחה!");
+      
+      if (result.meta.errorCount > 0) {
+        toast.warning(`סונכרנו ${result.meta.successCount} לינקים, ${result.meta.errorCount} נכשלו (${duration}s)`);
+      } else {
+        toast.success(`הנתונים סונכרנו בהצלחה! (${result.meta.successCount} לינקים, ${duration}s)`);
+      }
     } catch (error) {
       console.error("Error syncing analytics:", error);
       toast.error("סנכרון הנתונים נכשל");
