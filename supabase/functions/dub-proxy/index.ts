@@ -84,7 +84,7 @@ async function fetchLinkAnalytics(
   startDate?: string,
   endDate?: string
 ): Promise<{ linkId: string; clicks: number; error?: string }> {
-  const maxRetries = 2;
+  const maxRetries = 4; // Increased retries for rate limiting
   let lastError: string | null = null;
   
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -93,10 +93,8 @@ async function fetchLinkAnalytics(
       let url = `${baseUrl}/analytics?workspaceId=${workspaceId}&linkId=${encodeURIComponent(linkId)}&event=clicks`;
       
       if (startDate && endDate) {
-        // Use start/end for specific date range
         url += `&start=${encodeURIComponent(startDate)}&end=${encodeURIComponent(endDate)}`;
       } else {
-        // Default to all-time data
         url += `&interval=all`;
       }
 
@@ -105,13 +103,16 @@ async function fetchLinkAnalytics(
       if (!response.ok) {
         const errorText = await response.text();
         lastError = `HTTP ${response.status}: ${errorText.slice(0, 100)}`;
-        console.error(`[${linkId}] Attempt ${attempt + 1} failed: ${lastError}`);
         
-        // If rate limited, wait before retry
+        // If rate limited, wait with exponential backoff
         if (response.status === 429) {
-          await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+          const waitTime = 2000 * Math.pow(2, attempt); // 2s, 4s, 8s, 16s, 32s
+          console.log(`[${linkId}] Rate limited, waiting ${waitTime}ms before retry ${attempt + 1}/${maxRetries}`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
           continue;
         }
+        
+        console.error(`[${linkId}] Attempt ${attempt + 1} failed: ${lastError}`);
         
         // Don't retry on 4xx errors (except 429)
         if (response.status >= 400 && response.status < 500) {
@@ -121,7 +122,6 @@ async function fetchLinkAnalytics(
       }
       
       const data = await response.json();
-      // Dub.co returns clicks count directly or in an object
       const clicks = typeof data === 'number' 
         ? data 
         : (data.clicks || data.count || 0);
@@ -135,7 +135,6 @@ async function fetchLinkAnalytics(
     }
   }
   
-  // Return error info instead of silent 0
   return { linkId, clicks: -1, error: lastError || 'Unknown error' };
 }
 
@@ -299,13 +298,19 @@ Deno.serve(async (req) => {
 
         console.log(`[${requestId}] Fetching bulk analytics for ${linkIds.length} links, range: ${startDate || 'all-time'} to ${endDate || 'now'}`);
         
-        // Fetch analytics in parallel with batching (max 10 concurrent)
-        const batchSize = 10;
+        // Reduced batch size to avoid rate limiting (Dub.co has strict limits)
+        const batchSize = 3;
+        const batchDelayMs = 500; // Delay between batches
         const results: Record<string, number> = {};
         const errors: Record<string, string> = {};
         
         for (let i = 0; i < linkIds.length; i += batchSize) {
           const batch = linkIds.slice(i, i + batchSize);
+          const batchNumber = Math.floor(i / batchSize) + 1;
+          const totalBatches = Math.ceil(linkIds.length / batchSize);
+          
+          console.log(`[${requestId}] Processing batch ${batchNumber}/${totalBatches}`);
+          
           const batchResults = await Promise.all(
             batch.map((linkId: string) => 
               fetchLinkAnalytics(linkId, headers, baseUrl, DUB_WORKSPACE_ID!, startDate, endDate)
@@ -315,10 +320,14 @@ Deno.serve(async (req) => {
           for (const result of batchResults) {
             if (result.error) {
               errors[result.linkId] = result.error;
-              // Keep existing value (don't overwrite with -1)
             } else {
               results[result.linkId] = result.clicks;
             }
+          }
+          
+          // Add delay between batches to avoid rate limiting
+          if (i + batchSize < linkIds.length) {
+            await new Promise(resolve => setTimeout(resolve, batchDelayMs));
           }
         }
         
