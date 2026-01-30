@@ -1,13 +1,15 @@
 import { useState } from "react";
-import { Plus, Trash2, Loader2, FolderKanban, Link2, TrendingUp } from "lucide-react";
+import { Plus, Trash2, Loader2, FolderKanban, Link2, TrendingUp, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
 import { useCampaigns, useCreateCampaign, useDeleteCampaign } from "@/hooks/useCampaigns";
 import { useGeneratedLinks } from "@/hooks/useGeneratedLinks";
 import { CampaignSchema } from "@/lib/validation";
+import { CampaignLinks } from "@/components/CampaignLinks";
 
 export default function Campaigns() {
   const [newCampaignName, setNewCampaignName] = useState("");
   const [newCampaignDescription, setNewCampaignDescription] = useState("");
+  const [expandedCampaignId, setExpandedCampaignId] = useState<string | null>(null);
 
   const { data: campaigns, isLoading } = useCampaigns();
   const { data: allLinks } = useGeneratedLinks();
@@ -17,7 +19,11 @@ export default function Campaigns() {
   const getCampaignStats = (campaignId: string) => {
     const campaignLinks = allLinks?.filter((l) => l.campaign_id === campaignId) || [];
     const totalClicks = campaignLinks.reduce((sum, l) => sum + (l.clicks || 0), 0);
-    return { links: campaignLinks.length, clicks: totalClicks };
+    return { links: campaignLinks.length, clicks: totalClicks, campaignLinks };
+  };
+
+  const toggleCampaign = (campaignId: string) => {
+    setExpandedCampaignId(prev => prev === campaignId ? null : campaignId);
   };
 
   const handleAddCampaign = async (e: React.FormEvent) => {
@@ -140,51 +146,81 @@ export default function Campaigns() {
               <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
             </div>
           ) : campaigns && campaigns.length > 0 ? (
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4">
               {campaigns.map((campaign) => {
                 const stats = getCampaignStats(campaign.id);
+                const isExpanded = expandedCampaignId === campaign.id;
+                
                 return (
                   <div
                     key={campaign.id}
-                    className="bg-card rounded-xl border border-border p-5 shadow-sm hover:shadow-md transition-shadow"
+                    className="bg-card rounded-xl border border-border shadow-sm hover:shadow-md transition-shadow overflow-hidden"
                   >
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                          <FolderKanban className="h-5 w-5 text-primary" />
+                    {/* Campaign Header - Clickable */}
+                    <div 
+                      className="p-5 cursor-pointer"
+                      onClick={() => toggleCampaign(campaign.id)}
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                            <FolderKanban className="h-5 w-5 text-primary" />
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-foreground">{campaign.name}</h3>
+                            {campaign.description && (
+                              <p className="text-sm text-muted-foreground mt-0.5">
+                                {campaign.description}
+                              </p>
+                            )}
+                          </div>
                         </div>
-                        <div>
-                          <h3 className="font-semibold text-foreground">{campaign.name}</h3>
-                          {campaign.description && (
-                            <p className="text-sm text-muted-foreground mt-0.5">
-                              {campaign.description}
-                            </p>
-                          )}
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteCampaign(campaign.id, campaign.name);
+                            }}
+                            disabled={deleteCampaign.isPending}
+                            className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                          <div className="p-2 text-muted-foreground">
+                            {isExpanded ? (
+                              <ChevronUp className="h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4" />
+                            )}
+                          </div>
                         </div>
                       </div>
-                      <button
-                        onClick={() => handleDeleteCampaign(campaign.id, campaign.name)}
-                        disabled={deleteCampaign.isPending}
-                        className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+
+                      <div className="flex gap-4 pt-3 border-t border-border">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Link2 className="h-4 w-4" />
+                          <span>{stats.links} לינקים</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <TrendingUp className="h-4 w-4" />
+                          <span>{stats.clicks.toLocaleString()} קליקים</span>
+                        </div>
+                      </div>
+
+                      <p className="text-xs text-muted-foreground mt-3">
+                        נוצר ב-{new Date(campaign.created_at).toLocaleDateString("he-IL")}
+                      </p>
                     </div>
 
-                    <div className="flex gap-4 pt-3 border-t border-border">
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Link2 className="h-4 w-4" />
-                        <span>{stats.links} לינקים</span>
+                    {/* Expanded Links Section */}
+                    {isExpanded && (
+                      <div className="px-5 pb-5 pt-0 border-t border-border bg-muted/30">
+                        <div className="pt-4">
+                          <h4 className="text-sm font-medium text-foreground mb-3">לינקים בקמפיין</h4>
+                          <CampaignLinks links={stats.campaignLinks} />
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <TrendingUp className="h-4 w-4" />
-                        <span>{stats.clicks.toLocaleString()} קליקים</span>
-                      </div>
-                    </div>
-
-                    <p className="text-xs text-muted-foreground mt-3">
-                      נוצר ב-{new Date(campaign.created_at).toLocaleDateString("he-IL")}
-                    </p>
+                    )}
                   </div>
                 );
               })}
