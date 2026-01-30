@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useGeneratedLinks, useUpdateLinkClicks, LinksFilter } from "@/hooks/useGeneratedLinks";
 import { useSyncAnalytics } from "@/hooks/useDubApi";
+import { Progress } from "@/components/ui/progress";
 import { AnalyticsFilters } from "@/components/AnalyticsFilters";
 import { CampaignChannelMatrix } from "@/components/CampaignChannelMatrix";
 import { toast } from "sonner";
@@ -39,6 +40,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 export default function Analytics() {
   const [filters, setFilters] = useState<LinksFilter>({});
   const [isSyncing, setIsSyncing] = useState(false);
+  const [syncProgress, setSyncProgress] = useState({ current: 0, total: 0, percent: 0 });
 
   const { data: links, isLoading, refetch } = useGeneratedLinks(filters);
   const syncAnalytics = useSyncAnalytics();
@@ -57,6 +59,23 @@ export default function Analytics() {
     setIsSyncing(true);
     const syncStartTime = Date.now();
     
+    // Calculate batches for progress tracking (batch size = 3 in edge function)
+    const batchSize = 3;
+    const totalBatches = Math.ceil(linksWithDubId.length / batchSize);
+    setSyncProgress({ current: 0, total: totalBatches, percent: 0 });
+    
+    // Simulate progress while waiting for the API (since we can't stream from edge function)
+    const progressInterval = setInterval(() => {
+      setSyncProgress(prev => {
+        const estimatedBatch = Math.min(prev.current + 1, totalBatches - 1);
+        return {
+          ...prev,
+          current: estimatedBatch,
+          percent: Math.round((estimatedBatch / totalBatches) * 90) // Cap at 90% until complete
+        };
+      });
+    }, 1500); // Roughly matches batch processing time (batch + delay)
+    
     try {
       const dubLinkIds = linksWithDubId.map((l) => l.dub_link_id!);
       
@@ -70,6 +89,9 @@ export default function Analytics() {
       console.log('[Sync] Starting with params:', syncParams);
       
       const result = await syncAnalytics.mutateAsync(syncParams);
+      
+      clearInterval(progressInterval);
+      setSyncProgress({ current: totalBatches, total: totalBatches, percent: 100 });
       
       console.log('[Sync] Response:', {
         successCount: result.meta.successCount,
@@ -103,10 +125,13 @@ export default function Analytics() {
         toast.success(`הנתונים סונכרנו בהצלחה! (${result.meta.successCount} לינקים, ${duration}s)`);
       }
     } catch (error) {
+      clearInterval(progressInterval);
       console.error("Error syncing analytics:", error);
       toast.error("סנכרון הנתונים נכשל");
     }
     setIsSyncing(false);
+    // Reset progress after a short delay to show 100%
+    setTimeout(() => setSyncProgress({ current: 0, total: 0, percent: 0 }), 1000);
   };
 
   // Aggregate clicks by channel
@@ -250,6 +275,21 @@ export default function Analytics() {
             </button>
           </div>
         </div>
+
+        {/* Sync Progress Bar */}
+        {isSyncing && syncProgress.total > 0 && (
+          <div className="mb-6 bg-card rounded-xl border border-border p-4 shadow-sm">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-foreground">
+                מסנכרן נתונים...
+              </span>
+              <span className="text-sm text-muted-foreground">
+                באצ׳ {syncProgress.current} מתוך {syncProgress.total} ({syncProgress.percent}%)
+              </span>
+            </div>
+            <Progress value={syncProgress.percent} className="h-2" />
+          </div>
+        )}
 
         {/* Filters */}
         <AnalyticsFilters filters={filters} onFiltersChange={setFilters} />
