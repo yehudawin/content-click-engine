@@ -59,22 +59,22 @@ export default function Analytics() {
     setIsSyncing(true);
     const syncStartTime = Date.now();
     
-    // Calculate batches for progress tracking (batch size = 3 in edge function)
-    const batchSize = 3;
+    // Calculate batches for progress tracking (batch size = 2 in edge function)
+    const batchSize = 2;
     const totalBatches = Math.ceil(linksWithDubId.length / batchSize);
     setSyncProgress({ current: 0, total: totalBatches, percent: 0 });
     
-    // Simulate progress while waiting for the API (since we can't stream from edge function)
+    // Simulate progress while waiting for the API
     const progressInterval = setInterval(() => {
       setSyncProgress(prev => {
         const estimatedBatch = Math.min(prev.current + 1, totalBatches - 1);
         return {
           ...prev,
           current: estimatedBatch,
-          percent: Math.round((estimatedBatch / totalBatches) * 90) // Cap at 90% until complete
+          percent: Math.round((estimatedBatch / totalBatches) * 90)
         };
       });
-    }, 1500); // Roughly matches batch processing time (batch + delay)
+    }, 3000); // Matches batch processing time (2s delay + request time)
     
     try {
       const dubLinkIds = linksWithDubId.map((l) => l.dub_link_id!);
