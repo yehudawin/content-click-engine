@@ -84,12 +84,11 @@ async function fetchLinkAnalytics(
   startDate?: string,
   endDate?: string
 ): Promise<{ linkId: string; clicks: number; error?: string }> {
-  const maxRetries = 4; // Increased retries for rate limiting
+  const maxRetries = 5;
   let lastError: string | null = null;
   
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      // Build URL with optional date parameters
       let url = `${baseUrl}/analytics?workspaceId=${workspaceId}&linkId=${encodeURIComponent(linkId)}&event=clicks`;
       
       if (startDate && endDate) {
@@ -104,20 +103,25 @@ async function fetchLinkAnalytics(
         const errorText = await response.text();
         lastError = `HTTP ${response.status}: ${errorText.slice(0, 100)}`;
         
-        // If rate limited, wait with exponential backoff
         if (response.status === 429) {
-          const waitTime = 2000 * Math.pow(2, attempt); // 2s, 4s, 8s, 16s, 32s
-          console.log(`[${linkId}] Rate limited, waiting ${waitTime}ms before retry ${attempt + 1}/${maxRetries}`);
-          await new Promise(resolve => setTimeout(resolve, waitTime));
+          // Respect Retry-After header if present
+          const retryAfter = response.headers.get('Retry-After');
+          const waitTime = retryAfter 
+            ? Math.max(parseInt(retryAfter, 10) * 1000, 1000) 
+            : 3000 * Math.pow(2, attempt); // 3s, 6s, 12s, 24s, 48s
+          const jitter = Math.random() * 1000;
+          console.log(`[${linkId}] Rate limited, waiting ${waitTime + jitter}ms (attempt ${attempt + 1}/${maxRetries})`);
+          await new Promise(resolve => setTimeout(resolve, waitTime + jitter));
           continue;
         }
         
         console.error(`[${linkId}] Attempt ${attempt + 1} failed: ${lastError}`);
         
-        // Don't retry on 4xx errors (except 429)
         if (response.status >= 400 && response.status < 500) {
           break;
         }
+        // Wait before retrying server errors
+        await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
         continue;
       }
       
@@ -298,9 +302,9 @@ Deno.serve(async (req) => {
 
         console.log(`[${requestId}] Fetching bulk analytics for ${linkIds.length} links, range: ${startDate || 'all-time'} to ${endDate || 'now'}`);
         
-        // Reduced batch size to avoid rate limiting (Dub.co has strict limits)
-        const batchSize = 3;
-        const batchDelayMs = 500; // Delay between batches
+        // Sequential processing with delays to avoid rate limiting
+        const batchSize = 2;
+        const batchDelayMs = 2000; // 2s delay between batches
         const results: Record<string, number> = {};
         const errors: Record<string, string> = {};
         
