@@ -36,7 +36,7 @@ function isValidLinkId(linkId: unknown): boolean {
 }
 
 function isValidLinkIds(linkIds: unknown): boolean {
-  return Array.isArray(linkIds) && linkIds.length <= 500 && linkIds.every(id => isValidLinkId(id));
+  return Array.isArray(linkIds) && linkIds.length > 0 && linkIds.every(id => isValidLinkId(id));
 }
 
 function isValidDateString(date: unknown): boolean {
