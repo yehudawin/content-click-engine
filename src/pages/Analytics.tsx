@@ -11,9 +11,13 @@ import {
   Minus,
   Calendar,
   Download,
+  Clock,
+  CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
 import { useGeneratedLinks, useUpdateLinkClicks, LinksFilter } from "@/hooks/useGeneratedLinks";
 import { useSyncAnalytics } from "@/hooks/useDubApi";
+import { useSyncStatus } from "@/hooks/useSyncStatus";
 import { Progress } from "@/components/ui/progress";
 import { AnalyticsFilters } from "@/components/AnalyticsFilters";
 import { CampaignChannelMatrix } from "@/components/CampaignChannelMatrix";
@@ -45,6 +49,7 @@ export default function Analytics() {
   const { data: links, isLoading, refetch } = useGeneratedLinks(filters);
   const syncAnalytics = useSyncAnalytics();
   const updateClicks = useUpdateLinkClicks();
+  const { data: syncStatus } = useSyncStatus();
 
   // Sync clicks from Dub.co
   const handleSyncClicks = async () => {
@@ -254,7 +259,27 @@ export default function Analytics() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>
             <h1 className="text-2xl lg:text-3xl font-bold text-foreground mb-2">לוח בקרה אנליטי</h1>
-            <p className="text-muted-foreground">מעקב ביצועים מקיף בכל ערוצי ההפצה</p>
+            <div className="flex items-center gap-3">
+              <p className="text-muted-foreground">מעקב ביצועים מקיף בכל ערוצי ההפצה</p>
+              {syncStatus?.last_success_at && (
+                <span className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/50 px-2.5 py-1 rounded-full">
+                  <CheckCircle2 className="h-3 w-3 text-green-500" />
+                  סנכרון אחרון: {format(new Date(syncStatus.last_success_at), "HH:mm", { locale: he })}
+                </span>
+              )}
+              {syncStatus?.status === 'running' && (
+                <span className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/50 px-2.5 py-1 rounded-full">
+                  <RefreshCw className="h-3 w-3 animate-spin text-primary" />
+                  מסנכרן...
+                </span>
+              )}
+              {syncStatus?.status === 'failed' && !syncStatus?.last_success_at && (
+                <span className="flex items-center gap-1.5 text-xs text-destructive bg-destructive/10 px-2.5 py-1 rounded-full">
+                  <AlertCircle className="h-3 w-3" />
+                  סנכרון נכשל
+                </span>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <button

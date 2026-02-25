@@ -2,3 +2,6 @@ project_id = "tevrmffekrlrwxmlxxgb"
 
 [functions.dub-proxy]
 verify_jwt = false
+
+[functions.sync-analytics]
+verify_jwt = false
