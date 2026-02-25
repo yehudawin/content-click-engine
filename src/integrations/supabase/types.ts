@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      analytics_sync_status: {
+        Row: {
+          error_count: number
+          id: boolean
+          last_attempt_at: string | null
+          last_success_at: string | null
+          message: string | null
+          status: string
+          success_count: number
+          synced_links: number
+          updated_at: string
+        }
+        Insert: {
+          error_count?: number
+          id?: boolean
+          last_attempt_at?: string | null
+          last_success_at?: string | null
+          message?: string | null
+          status?: string
+          success_count?: number
+          synced_links?: number
+          updated_at?: string
+        }
+        Update: {
+          error_count?: number
+          id?: boolean
+          last_attempt_at?: string | null
+          last_success_at?: string | null
+          message?: string | null
+          status?: string
+          success_count?: number
+          synced_links?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       campaigns: {
         Row: {
           created_at: string
