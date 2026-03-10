@@ -56,9 +56,50 @@ export function CampaignLinks({ links }: CampaignLinksProps) {
             </div>
           </div>
           
-          <div className="flex items-center gap-2 text-sm font-semibold">
-            <MousePointerClick className="h-4 w-4 text-primary" />
-            <span>{(link.clicks || 0).toLocaleString()}</span>
+          <div className="flex items-center gap-3">
+            <Popover>
+              <PopoverTrigger asChild>
+                <button className="p-1.5 rounded-md hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
+                  <QrCode className="h-4 w-4" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-4" align="end">
+                <div className="flex flex-col items-center gap-3">
+                  <p className="text-sm font-medium text-foreground">QR Code</p>
+                  <div className="bg-white p-3 rounded-lg">
+                    <QRCodeSVG value={link.short_link} size={160} id={`qr-link-${link.id}`} />
+                  </div>
+                  <button
+                    onClick={() => {
+                      const svg = document.getElementById(`qr-link-${link.id}`);
+                      if (!svg) return;
+                      const svgData = new XMLSerializer().serializeToString(svg);
+                      const canvas = document.createElement("canvas");
+                      canvas.width = 320;
+                      canvas.height = 320;
+                      const ctx = canvas.getContext("2d");
+                      const img = new Image();
+                      img.onload = () => {
+                        ctx?.drawImage(img, 0, 0, 320, 320);
+                        const a = document.createElement("a");
+                        a.download = `qr-${link.channels?.name || "link"}.png`;
+                        a.href = canvas.toDataURL("image/png");
+                        a.click();
+                      };
+                      img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData)));
+                    }}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                  >
+                    <Download className="h-3 w-3" />
+                    הורד PNG
+                  </button>
+                </div>
+              </PopoverContent>
+            </Popover>
+            <div className="flex items-center gap-2 text-sm font-semibold">
+              <MousePointerClick className="h-4 w-4 text-primary" />
+              <span>{(link.clicks || 0).toLocaleString()}</span>
+            </div>
           </div>
         </div>
       ))}
