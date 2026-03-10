@@ -1,6 +1,8 @@
-import { Copy, Check, ExternalLink } from "lucide-react";
+import { Copy, Check, ExternalLink, QrCode, Download } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { QRCodeSVG } from "qrcode.react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface GeneratedBlockProps {
   channelName: string;
