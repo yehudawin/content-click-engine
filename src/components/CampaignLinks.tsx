@@ -1,5 +1,7 @@
-import { Link2, ExternalLink, MousePointerClick } from "lucide-react";
+import { Link2, ExternalLink, MousePointerClick, QrCode, Download } from "lucide-react";
 import { GeneratedLink } from "@/hooks/useGeneratedLinks";
+import { QRCodeSVG } from "qrcode.react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface CampaignLinksProps {
   links: GeneratedLink[];
