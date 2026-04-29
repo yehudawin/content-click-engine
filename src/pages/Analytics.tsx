@@ -603,7 +603,7 @@ export default function Analytics() {
                     <div className="flex items-center gap-2 min-w-0">
                       <span
                         className="w-2.5 h-2.5 rounded-sm flex-shrink-0"
-                        style={{ backgroundColor: c.color || PIE_PALETTE[i % PIE_PALETTE.length] }}
+                        style={{ backgroundColor: PIE_PALETTE[i % PIE_PALETTE.length] }}
                       />
                       <span className="truncate text-foreground">{c.name}</span>
                     </div>
