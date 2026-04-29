@@ -489,20 +489,17 @@ export default function Analytics() {
           ) : timeSeriesData.length > 0 ? (
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={timeSeriesData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <ComposedChart data={timeSeriesData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="grad-clicks" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.5} />
                       <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} />
                     </linearGradient>
-                    <linearGradient id="grad-links" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="hsl(var(--accent))" stopOpacity={0.4} />
-                      <stop offset="100%" stopColor="hsl(var(--accent))" stopOpacity={0} />
-                    </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                   <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={11} tickMargin={8} />
-                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                  <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                  <YAxis yAxisId="right" orientation="left" stroke="hsl(var(--muted-foreground))" fontSize={12} allowDecimals={false} />
                   <Tooltip
                     contentStyle={{
                       backgroundColor: "hsl(var(--card))",
@@ -513,25 +510,26 @@ export default function Analytics() {
                     }}
                     formatter={(value: number, name: string) => [
                       value.toLocaleString(),
-                      name === "clicks" ? "קליקים" : "לינקים חדשים",
+                      name === "cumulativeClicks" ? "קליקים מצטברים" : "לינקים חדשים",
                     ]}
                     labelFormatter={(label) => `תאריך: ${label}`}
                   />
                   <Area
+                    yAxisId="left"
                     type="monotone"
-                    dataKey="clicks"
+                    dataKey="cumulativeClicks"
                     stroke="hsl(var(--primary))"
                     strokeWidth={2.5}
                     fill="url(#grad-clicks)"
                   />
-                  <Area
-                    type="monotone"
+                  <Bar
+                    yAxisId="right"
                     dataKey="links"
-                    stroke="hsl(var(--accent))"
-                    strokeWidth={2}
-                    fill="url(#grad-links)"
+                    fill="hsl(var(--accent))"
+                    radius={[4, 4, 0, 0]}
+                    maxBarSize={18}
                   />
-                </AreaChart>
+                </ComposedChart>
               </ResponsiveContainer>
             </div>
           ) : (
