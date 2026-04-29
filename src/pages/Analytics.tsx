@@ -166,18 +166,31 @@ export default function Analytics() {
     return acc;
   }, [links]);
 
-  // Time series — last 30 days
+  // Time series — last 30 active data days, with cumulative baseline before the visible range
   const { timeSeriesData, recent7Clicks, prev7Clicks } = useMemo(() => {
     if (!links || links.length === 0)
       return { timeSeriesData: [] as any[], recent7Clicks: 0, prev7Clicks: 0 };
 
-    const endDate = new Date();
+    const sortedDates = links
+      .map((link) => parseISO(link.created_at))
+      .sort((a, b) => a.getTime() - b.getTime());
+    const latestDataDate = sortedDates[sortedDates.length - 1] || new Date();
+    const endDate = filters.dateTo ? parseISO(filters.dateTo) : latestDataDate;
     const startDate = filters.dateFrom ? parseISO(filters.dateFrom) : subDays(endDate, 29);
+    if (startDate > endDate) return { timeSeriesData: [] as any[], recent7Clicks: 0, prev7Clicks: 0 };
+
     const days = eachDayOfInterval({ start: startDate, end: endDate });
+
+    const baselineClicks = links.reduce((sum, link) => {
+      const createdAt = parseISO(link.created_at);
+      return createdAt < startDate ? sum + (link.clicks || 0) : sum;
+    }, 0);
 
     const byDate = links.reduce(
       (acc, link) => {
-        const date = format(parseISO(link.created_at), "yyyy-MM-dd");
+        const createdAt = parseISO(link.created_at);
+        if (createdAt < startDate || createdAt > endDate) return acc;
+        const date = format(createdAt, "yyyy-MM-dd");
         if (!acc[date]) acc[date] = { links: 0, clicks: 0 };
         acc[date].links += 1;
         acc[date].clicks += link.clicks || 0;
@@ -186,8 +199,8 @@ export default function Analytics() {
       {} as Record<string, { links: number; clicks: number }>,
     );
 
-    // Cumulative clicks: total clicks accumulated by all links created up to & including each day
-    let cumClicks = 0;
+    // Cumulative clicks: visible growth plus total clicks that existed before the range
+    let cumClicks = baselineClicks;
     let cumLinks = 0;
     const series = days.map((day) => {
       const key = format(day, "yyyy-MM-dd");
@@ -204,11 +217,11 @@ export default function Analytics() {
       };
     });
 
-    const r7 = series.slice(-7).reduce((s, d) => s + d.links, 0);
-    const p7 = series.slice(-14, -7).reduce((s, d) => s + d.links, 0);
+    const r7 = series.slice(-7).reduce((s, d) => s + d.clicks, 0);
+    const p7 = series.slice(-14, -7).reduce((s, d) => s + d.clicks, 0);
 
     return { timeSeriesData: series, recent7Clicks: r7, prev7Clicks: p7 };
-  }, [links, filters.dateFrom]);
+  }, [links, filters.dateFrom, filters.dateTo]);
 
   const channelData = Object.values(channelStats).sort((a, b) => b.clicks - a.clicks);
   const campaignData = Object.values(campaignStats).sort((a, b) => b.clicks - a.clicks);
@@ -464,10 +477,10 @@ export default function Analytics() {
             <div>
               <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
                 <Calendar className="h-5 w-5 text-primary" />
-                צמיחה ב-30 הימים האחרונים
+                צמיחה לפי תקופת הנתונים הפעילה
               </h2>
               <p className="text-xs text-muted-foreground mt-1">
-                קליקים מצטברים מכלל הלינקים שנוצרו עד אותו יום, ומספר הלינקים החדשים שנוצרו ביום
+                קליקים מצטברים עד יום הנתונים האחרון, לצד לינקים חדשים שנוצרו בכל יום
               </p>
             </div>
             <div className="flex items-center gap-4 text-sm">
