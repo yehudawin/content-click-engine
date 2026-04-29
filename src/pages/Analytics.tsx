@@ -184,19 +184,26 @@ export default function Analytics() {
       {} as Record<string, { links: number; clicks: number }>,
     );
 
+    // Cumulative clicks: total clicks accumulated by all links created up to & including each day
+    let cumClicks = 0;
+    let cumLinks = 0;
     const series = days.map((day) => {
       const key = format(day, "yyyy-MM-dd");
       const d = byDate[key] || { links: 0, clicks: 0 };
+      cumClicks += d.clicks;
+      cumLinks += d.links;
       return {
         date: format(day, "dd/MM", { locale: he }),
         fullDate: key,
         links: d.links,
         clicks: d.clicks,
+        cumulativeClicks: cumClicks,
+        cumulativeLinks: cumLinks,
       };
     });
 
-    const r7 = series.slice(-7).reduce((s, d) => s + d.clicks, 0);
-    const p7 = series.slice(-14, -7).reduce((s, d) => s + d.clicks, 0);
+    const r7 = series.slice(-7).reduce((s, d) => s + d.links, 0);
+    const p7 = series.slice(-14, -7).reduce((s, d) => s + d.links, 0);
 
     return { timeSeriesData: series, recent7Clicks: r7, prev7Clicks: p7 };
   }, [links, filters.dateFrom]);
