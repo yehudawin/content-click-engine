@@ -225,11 +225,11 @@ export type Database = {
         Returns: boolean
       }
       is_user_approved: { Args: { _user_id: string }; Returns: boolean }
+      reset_stale_sync_status: { Args: never; Returns: undefined }
       sync_link_clicks: {
         Args: { _link_id: string; _new_clicks: number }
         Returns: undefined
       }
-      reset_stale_sync_status: { Args: Record<string, never>; Returns: undefined }
     }
     Enums: {
       app_role: "admin" | "user"
