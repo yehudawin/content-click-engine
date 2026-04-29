@@ -18,6 +18,7 @@ import {
 import { useGeneratedLinks, useUpdateLinkClicks, LinksFilter } from "@/hooks/useGeneratedLinks";
 import { useSyncAnalytics } from "@/hooks/useDubApi";
 import { useSyncStatus } from "@/hooks/useSyncStatus";
+import { supabase } from "@/integrations/supabase/client";
 import { Progress } from "@/components/ui/progress";
 import { AnalyticsFilters } from "@/components/AnalyticsFilters";
 import { CampaignChannelMatrix } from "@/components/CampaignChannelMatrix";
