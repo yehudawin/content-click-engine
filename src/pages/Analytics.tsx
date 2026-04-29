@@ -595,23 +595,29 @@ export default function Analytics() {
               </div>
             )}
 
-            {/* Mini legend */}
-            {channelData.slice(0, 5).length > 0 && (
-              <div className="mt-4 space-y-1.5 max-h-32 overflow-y-auto">
-                {channelData.slice(0, 5).map((c, i) => (
-                  <div key={c.name} className="flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span
-                        className="w-2.5 h-2.5 rounded-sm flex-shrink-0"
-                        style={{ backgroundColor: PIE_PALETTE[i % PIE_PALETTE.length] }}
-                      />
-                      <span className="truncate text-foreground">{c.name}</span>
+            {/* Legend */}
+            {channelData.slice(0, 8).length > 0 && (
+              <div className="mt-4 space-y-1.5 max-h-40 overflow-y-auto">
+                {channelData.slice(0, 8).map((c, i) => {
+                  const pct = totalClicks > 0 ? Math.round((c.clicks / totalClicks) * 100) : 0;
+                  return (
+                    <div key={c.name} className="flex items-center justify-between text-xs gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span
+                          className="w-2.5 h-2.5 rounded-sm flex-shrink-0"
+                          style={{ backgroundColor: PIE_PALETTE[i % PIE_PALETTE.length] }}
+                        />
+                        <span className="truncate text-foreground">{c.name}</span>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="text-muted-foreground tabular-nums">{pct}%</span>
+                        <span className="font-semibold tabular-nums text-foreground">
+                          {c.clicks.toLocaleString()}
+                        </span>
+                      </div>
                     </div>
-                    <span className="font-semibold tabular-nums text-muted-foreground flex-shrink-0">
-                      {c.clicks.toLocaleString()}
-                    </span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
