@@ -9,8 +9,18 @@ import { AuthGuard } from "@/components/AuthGuard";
 import { useAuth, useIsAdmin } from "@/hooks/useAuth";
 
 // Lazy-load route components so the heavy charts/forms aren't in the entry chunk.
-const Generator = lazy(() => import("./pages/Generator"));
-const Analytics = lazy(() => import("./pages/Analytics"));
+// Analytics retries once on chunk-load failures (common after HMR updates).
+const lazyWithRetry = <T,>(factory: () => Promise<T>) =>
+  lazy(() =>
+    (factory() as Promise<any>).catch(async (err) => {
+      console.warn("[lazy] retrying chunk after failure:", err);
+      await new Promise((r) => setTimeout(r, 300));
+      return factory();
+    }),
+  );
+
+const Generator = lazyWithRetry(() => import("./pages/Generator"));
+const Analytics = lazyWithRetry(() => import("./pages/Analytics"));
 const Settings = lazy(() => import("./pages/Settings"));
 const Campaigns = lazy(() => import("./pages/Campaigns"));
 const AdminUsers = lazy(() => import("./pages/AdminUsers"));
