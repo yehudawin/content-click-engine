@@ -38,6 +38,8 @@ import {
   Legend,
   AreaChart,
   Area,
+  ComposedChart,
+  Bar,
   PieChart,
   Pie,
   RadialBarChart,
