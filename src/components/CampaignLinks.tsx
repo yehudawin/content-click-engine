@@ -3,6 +3,13 @@ import { GeneratedLink } from "@/hooks/useGeneratedLinks";
 import { QRCodeSVG } from "qrcode.react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
+function utf8ToBase64(s: string): string {
+  const bytes = new TextEncoder().encode(s);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
+
 interface CampaignLinksProps {
   links: GeneratedLink[];
 }
@@ -86,7 +93,7 @@ export function CampaignLinks({ links }: CampaignLinksProps) {
                         a.href = canvas.toDataURL("image/png");
                         a.click();
                       };
-                      img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData)));
+                      img.src = "data:image/svg+xml;base64," + utf8ToBase64(svgData);
                     }}
                     className="flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
                   >

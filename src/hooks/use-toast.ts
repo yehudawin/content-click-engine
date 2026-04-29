@@ -167,6 +167,9 @@ function useToast() {
   const [state, setState] = React.useState<State>(memoryState);
 
   React.useEffect(() => {
+    // Subscribe once on mount; setState identity is stable so we don't depend
+    // on `state` (which would re-add the listener after every dispatch and
+    // grow the listeners array on each render).
     listeners.push(setState);
     return () => {
       const index = listeners.indexOf(setState);
@@ -174,7 +177,7 @@ function useToast() {
         listeners.splice(index, 1);
       }
     };
-  }, [state]);
+  }, []);
 
   return {
     ...state,

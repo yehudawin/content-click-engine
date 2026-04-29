@@ -1,8 +1,17 @@
 import { Copy, Check, ExternalLink, QrCode, Download } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { QRCodeSVG } from "qrcode.react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+
+// Modern, deprecation-safe equivalent of `btoa(unescape(encodeURIComponent(s)))`.
+// Required because SVG strings contain Unicode that plain btoa cannot encode.
+function utf8ToBase64(s: string): string {
+  const bytes = new TextEncoder().encode(s);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
 
 interface GeneratedBlockProps {
   channelName: string;
@@ -20,15 +29,23 @@ export function GeneratedBlock({
   index,
 }: GeneratedBlockProps) {
   const [copied, setCopied] = useState(false);
+  const copyResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fullText = `${adCopy}\n\n${shortLink}`;
+
+  // Clear any pending "copied" reset on unmount so we don't call setState
+  // on an unmounted component.
+  useEffect(() => () => {
+    if (copyResetTimer.current) clearTimeout(copyResetTimer.current);
+  }, []);
 
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(fullText);
       setCopied(true);
       toast.success(`הועתק בלוק ${channelName}!`);
-      setTimeout(() => setCopied(false), 2000);
+      if (copyResetTimer.current) clearTimeout(copyResetTimer.current);
+      copyResetTimer.current = setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       toast.error("ההעתקה נכשלה");
     }
@@ -118,7 +135,7 @@ export function GeneratedBlock({
                     a.href = canvas.toDataURL("image/png");
                     a.click();
                   };
-                  img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData)));
+                  img.src = "data:image/svg+xml;base64," + utf8ToBase64(svgData);
                 }}
                 className="flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
               >

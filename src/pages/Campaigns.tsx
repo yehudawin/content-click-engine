@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Plus, Trash2, Loader2, FolderKanban, Link2, TrendingUp, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
 import { useCampaigns, useCreateCampaign, useDeleteCampaign } from "@/hooks/useCampaigns";
-import { useGeneratedLinks } from "@/hooks/useGeneratedLinks";
+import { useGeneratedLinks, GeneratedLink } from "@/hooks/useGeneratedLinks";
 import { CampaignSchema } from "@/lib/validation";
 import { CampaignLinks } from "@/components/CampaignLinks";
 
@@ -16,8 +16,21 @@ export default function Campaigns() {
   const createCampaign = useCreateCampaign();
   const deleteCampaign = useDeleteCampaign();
 
+  // Bucket links by campaign once instead of filtering allLinks for every
+  // campaign on every render (was O(N*M); now O(N+M)).
+  const linksByCampaign = useMemo(() => {
+    const map = new Map<string, GeneratedLink[]>();
+    for (const link of allLinks ?? []) {
+      if (!link.campaign_id) continue;
+      const list = map.get(link.campaign_id);
+      if (list) list.push(link);
+      else map.set(link.campaign_id, [link]);
+    }
+    return map;
+  }, [allLinks]);
+
   const getCampaignStats = (campaignId: string) => {
-    const campaignLinks = allLinks?.filter((l) => l.campaign_id === campaignId) || [];
+    const campaignLinks = linksByCampaign.get(campaignId) ?? [];
     const totalClicks = campaignLinks.reduce((sum, l) => sum + (l.clicks || 0), 0);
     return { links: campaignLinks.length, clicks: totalClicks, campaignLinks };
   };

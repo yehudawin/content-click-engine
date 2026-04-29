@@ -146,6 +146,23 @@ export function useAllProfiles() {
   });
 }
 
+// Single batched fetch of all user_roles for admins. Avoids the N+1 query
+// pattern of calling useUserRole() once per row in a list.
+export function useAllUserRoles() {
+  return useQuery({
+    queryKey: ["all-user-roles"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("user_roles")
+        .select("user_id, role");
+      if (error) throw error;
+      return new Map<string, "admin" | "user">(
+        (data ?? []).map((r) => [r.user_id, r.role as "admin" | "user"]),
+      );
+    },
+  });
+}
+
 export function useApproveUser() {
   const queryClient = useQueryClient();
   
@@ -183,6 +200,7 @@ export function useSetUserRole() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["all-profiles"] });
       queryClient.invalidateQueries({ queryKey: ["user-role"] });
+      queryClient.invalidateQueries({ queryKey: ["all-user-roles"] });
     },
   });
 }

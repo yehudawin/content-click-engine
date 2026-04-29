@@ -1,10 +1,11 @@
-import { useState } from "react";
-import { useAllProfiles, useApproveUser, useSetUserRole, useUserRole } from "@/hooks/useAuth";
+import { useAllProfiles, useAllUserRoles, useApproveUser, useSetUserRole } from "@/hooks/useAuth";
 import { toast } from "sonner";
-import { Users, Check, X, Shield, User, Clock, Mail } from "lucide-react";
+import { Users, Check, X, Shield, Clock, Mail } from "lucide-react";
 
 export default function AdminUsers() {
   const { data: profiles, isLoading } = useAllProfiles();
+  // Load all user roles in one query instead of one query per row.
+  const { data: rolesByUserId } = useAllUserRoles();
   const approveUser = useApproveUser();
   const setUserRole = useSetUserRole();
 
@@ -56,6 +57,7 @@ export default function AdminUsers() {
                 <UserRow
                   key={profile.id}
                   profile={profile}
+                  isAdmin={rolesByUserId?.get(profile.user_id) === "admin"}
                   onApprove={handleApprove}
                   onSetAdmin={handleSetAdmin}
                 />
@@ -82,14 +84,12 @@ interface UserRowProps {
     is_approved: boolean;
     created_at: string;
   };
+  isAdmin: boolean;
   onApprove: (userId: string, approve: boolean) => void;
   onSetAdmin: (userId: string, isAdmin: boolean) => void;
 }
 
-function UserRow({ profile, onApprove, onSetAdmin }: UserRowProps) {
-  const { data: role } = useUserRole(profile.user_id);
-  const isAdmin = role?.role === "admin";
-
+function UserRow({ profile, isAdmin, onApprove, onSetAdmin }: UserRowProps) {
   return (
     <div className="p-4 lg:p-6 flex flex-col lg:flex-row lg:items-center gap-4">
       {/* User Info */}

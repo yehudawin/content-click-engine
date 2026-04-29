@@ -67,7 +67,11 @@ export default function Auth() {
           }
         } else {
           toast.success("נרשמת בהצלחה! המתן לאישור מנהל");
+          // Reset to a clean login screen so the next interaction doesn't
+          // carry over the registration data.
           setIsLogin(true);
+          setPassword("");
+          setDisplayName("");
         }
       }
     } finally {
@@ -208,6 +212,10 @@ export default function Auth() {
                 onClick={() => {
                   setIsLogin(!isLogin);
                   setErrors({});
+                  // Clear sensitive fields when switching modes so the user
+                  // doesn't accidentally re-submit credentials in the wrong flow.
+                  setPassword("");
+                  setDisplayName("");
                 }}
                 className="text-primary hover:underline mr-1 font-medium"
               >
