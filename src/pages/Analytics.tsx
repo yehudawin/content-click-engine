@@ -54,7 +54,7 @@ export default function Analytics() {
   const updateClicks = useUpdateLinkClicks();
   const { data: syncStatus } = useSyncStatus();
 
-  // Sync clicks from Dub.co
+  // Trigger background sync via sync-analytics edge function (avoids 150s timeout)
   const handleSyncClicks = async () => {
     if (!links || links.length === 0) return;
 
@@ -66,86 +66,69 @@ export default function Analytics() {
 
     setIsSyncing(true);
     const syncStartTime = Date.now();
-    
-    // Calculate batches for progress tracking (batch size = 2 in edge function)
-    const batchSize = 2;
-    const totalBatches = Math.ceil(linksWithDubId.length / batchSize);
-    setSyncProgress({ current: 0, total: totalBatches, percent: 0 });
-    
-    // Simulate progress while waiting for the API
-    const progressInterval = setInterval(() => {
-      setSyncProgress(prev => {
-        const estimatedBatch = Math.min(prev.current + 1, totalBatches - 1);
-        return {
-          ...prev,
-          current: estimatedBatch,
-          percent: Math.round((estimatedBatch / totalBatches) * 90)
-        };
-      });
-    }, 3000); // Matches batch processing time (2s delay + request time)
-    
+    setSyncProgress({ current: 0, total: linksWithDubId.length, percent: 5 });
+
     try {
-      const dubLinkIds = linksWithDubId.map((l) => l.dub_link_id!);
-      
-      // Build date params if filters are set
-      const syncParams = {
-        linkIds: dubLinkIds,
-        startDate: filters.dateFrom ? `${filters.dateFrom}T00:00:00Z` : undefined,
-        endDate: filters.dateTo ? `${filters.dateTo}T23:59:59Z` : undefined,
-      };
-      
-      console.log('[Sync] Starting with params:', syncParams);
-      
-      const result = await syncAnalytics.mutateAsync(syncParams);
-      
-      clearInterval(progressInterval);
-      setSyncProgress({ current: totalBatches, total: totalBatches, percent: 100 });
-      
-      console.log('[Sync] Response:', {
-        successCount: result.meta.successCount,
-        errorCount: result.meta.errorCount,
-        requestId: result.meta.requestId,
-      });
+      // Fire-and-forget: sync-analytics runs in background, updates DB directly.
+      // We don't await the response (it can exceed client timeout); we poll status.
+      supabase.functions
+        .invoke("sync-analytics", { body: {} })
+        .catch((err) => console.warn("[Sync] background invoke error (non-fatal):", err));
 
-      // Update clicks in database via monotonic RPC - never decreases.
-      // Only call for links whose new clicks differ from the cached value;
-      // the RPC itself will GREATEST() on the server.
-      const updatePromises = linksWithDubId
-        .filter(link => {
-          const newClicks = result.data[link.dub_link_id!];
-          return (
-            newClicks !== undefined &&
-            newClicks >= 0 &&
-            newClicks > (link.clicks ?? 0)
-          );
-        })
-        .map(link =>
-          updateClicks.mutateAsync({
-            id: link.id,
-            clicks: result.data[link.dub_link_id!],
-          })
-        );
+      toast.info("הסנכרון התחיל ברקע, זה עשוי לקחת כמה דקות...");
 
-      await Promise.all(updatePromises);
-      
-      const duration = ((Date.now() - syncStartTime) / 1000).toFixed(1);
-      
-      await refetch();
-      
-      if (result.meta.errorCount > 0) {
-        toast.warning(`סונכרנו ${result.meta.successCount} לינקים, ${result.meta.errorCount} נכשלו (${duration}s)`);
-      } else {
-        toast.success(`הנתונים סונכרנו בהצלחה! (${result.meta.successCount} לינקים, ${duration}s)`);
+      // Poll analytics_sync_status until completed/failed (max ~5 min)
+      const maxAttempts = 60;
+      let attempts = 0;
+      let finalStatus: string | null = null;
+
+      while (attempts < maxAttempts) {
+        await new Promise((r) => setTimeout(r, 5000));
+        attempts++;
+
+        const { data: status } = await supabase
+          .from("analytics_sync_status")
+          .select("*")
+          .eq("id", true)
+          .maybeSingle();
+
+        if (status) {
+          const synced = status.synced_links ?? 0;
+          const total = linksWithDubId.length;
+          setSyncProgress({
+            current: synced,
+            total,
+            percent: Math.min(95, Math.round((synced / total) * 100)),
+          });
+
+          if (status.status === "completed" || status.status === "failed") {
+            finalStatus = status.status;
+            const duration = ((Date.now() - syncStartTime) / 1000).toFixed(1);
+            await refetch();
+            setSyncProgress({ current: total, total, percent: 100 });
+
+            if (status.status === "completed") {
+              toast.success(`סנכרון הושלם! (${status.success_count} לינקים, ${duration}s)`);
+            } else {
+              toast.error(status.message || "הסנכרון נכשל");
+            }
+            break;
+          }
+        }
+      }
+
+      if (!finalStatus) {
+        toast.warning("הסנכרון עדיין רץ ברקע. רענן בעוד דקה.");
+        await refetch();
       }
     } catch (error) {
-      clearInterval(progressInterval);
       console.error("Error syncing analytics:", error);
       toast.error("סנכרון הנתונים נכשל");
     }
     setIsSyncing(false);
-    // Reset progress after a short delay to show 100%
     setTimeout(() => setSyncProgress({ current: 0, total: 0, percent: 0 }), 1000);
   };
+
 
   // Aggregate clicks by channel
   const channelStats = useMemo(() => {
