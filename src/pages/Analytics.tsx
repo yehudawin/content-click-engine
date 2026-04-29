@@ -477,10 +477,10 @@ export default function Analytics() {
             <div>
               <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
                 <Calendar className="h-5 w-5 text-primary" />
-                צמיחה ב-30 הימים האחרונים
+                צמיחה לפי תקופת הנתונים הפעילה
               </h2>
               <p className="text-xs text-muted-foreground mt-1">
-                קליקים מצטברים מכלל הלינקים שנוצרו עד אותו יום, ומספר הלינקים החדשים שנוצרו ביום
+                קליקים מצטברים עד יום הנתונים האחרון, לצד לינקים חדשים שנוצרו בכל יום
               </p>
             </div>
             <div className="flex items-center gap-4 text-sm">
