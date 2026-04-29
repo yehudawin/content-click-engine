@@ -567,7 +567,7 @@ export default function Analytics() {
                       strokeWidth={0}
                     >
                       {channelData.slice(0, 8).map((entry, i) => (
-                        <Cell key={i} fill={entry.color || PIE_PALETTE[i % PIE_PALETTE.length]} />
+                        <Cell key={i} fill={PIE_PALETTE[i % PIE_PALETTE.length]} />
                       ))}
                     </Pie>
                     <Tooltip
