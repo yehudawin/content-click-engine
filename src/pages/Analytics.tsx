@@ -462,20 +462,20 @@ export default function Analytics() {
             <div>
               <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
                 <Calendar className="h-5 w-5 text-primary" />
-                מגמת קליקים — 30 ימים
+                צמיחה ב-30 הימים האחרונים
               </h2>
               <p className="text-xs text-muted-foreground mt-1">
-                סך קליקים מצטבר לפי יום יצירת הלינק
+                קליקים מצטברים מכלל הלינקים שנוצרו עד אותו יום, ומספר הלינקים החדשים שנוצרו ביום
               </p>
             </div>
             <div className="flex items-center gap-4 text-sm">
               <div className="flex items-center gap-2">
                 <span className="w-3 h-3 rounded-full bg-primary" />
-                <span className="text-muted-foreground">קליקים</span>
+                <span className="text-muted-foreground">קליקים מצטברים</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="w-3 h-3 rounded-full bg-accent" />
-                <span className="text-muted-foreground">לינקים חדשים</span>
+                <span className="text-muted-foreground">לינקים חדשים ביום</span>
               </div>
             </div>
           </div>
