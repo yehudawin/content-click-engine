@@ -41,10 +41,13 @@ import { format, parseISO, startOfDay, eachDayOfInterval, subDays } from "date-f
 import { he } from "date-fns/locale";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
+const PAGE_SIZE = 25;
+
 export default function Analytics() {
   const [filters, setFilters] = useState<LinksFilter>({});
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState({ current: 0, total: 0, percent: 0 });
+  const [page, setPage] = useState(0);
 
   const { data: links, isLoading, refetch } = useGeneratedLinks(filters);
   const syncAnalytics = useSyncAnalytics();
@@ -104,20 +107,25 @@ export default function Analytics() {
         requestId: result.meta.requestId,
       });
 
-      // Update clicks in database - batch updates
+      // Update clicks in database via monotonic RPC - never decreases.
+      // Only call for links whose new clicks differ from the cached value;
+      // the RPC itself will GREATEST() on the server.
       const updatePromises = linksWithDubId
         .filter(link => {
           const newClicks = result.data[link.dub_link_id!];
-          // Only update if we got valid data (not undefined) and it's different
-          return newClicks !== undefined && newClicks >= 0 && newClicks !== link.clicks;
+          return (
+            newClicks !== undefined &&
+            newClicks >= 0 &&
+            newClicks > (link.clicks ?? 0)
+          );
         })
-        .map(link => 
-          updateClicks.mutateAsync({ 
-            id: link.id, 
-            clicks: result.data[link.dub_link_id!] 
+        .map(link =>
+          updateClicks.mutateAsync({
+            id: link.id,
+            clicks: result.data[link.dub_link_id!],
           })
         );
-      
+
       await Promise.all(updatePromises);
       
       const duration = ((Date.now() - syncStartTime) / 1000).toFixed(1);
@@ -240,7 +248,12 @@ export default function Analytics() {
       new Date(link.created_at).toLocaleDateString("he-IL"),
     ]);
 
-    const csvContent = [headers, ...rows].map((row) => row.map((cell) => `"${cell}"`).join(",")).join("\n");
+    // RFC 4180 escaping: wrap each cell in quotes and double any internal quotes.
+    // Also strip CR/LF would break Excel; quoting handles it but we still escape quotes.
+    const escapeCsvCell = (value: string): string => `"${value.replace(/"/g, '""')}"`;
+    const csvContent = [headers, ...rows]
+      .map((row) => row.map((cell) => escapeCsvCell(String(cell ?? ""))).join(","))
+      .join("\r\n");
 
     const blob = new Blob(["\ufeff" + csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -317,7 +330,13 @@ export default function Analytics() {
         )}
 
         {/* Filters */}
-        <AnalyticsFilters filters={filters} onFiltersChange={setFilters} />
+        <AnalyticsFilters
+          filters={filters}
+          onFiltersChange={(next) => {
+            setFilters(next);
+            setPage(0);
+          }}
+        />
 
         {/* Stats Cards */}
         <div className="grid gap-4 grid-cols-2 lg:grid-cols-4 mb-8">
@@ -335,10 +354,15 @@ export default function Analytics() {
         {/* Time Series Chart */}
         <div className="bg-card rounded-xl border border-border p-4 lg:p-6 shadow-sm mb-8">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-              <Calendar className="h-5 w-5 text-muted-foreground" />
-              מגמת קליקים לאורך זמן
-            </h2>
+            <div>
+              <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-muted-foreground" />
+                קליקים לפי תאריך יצירת הלינק
+              </h2>
+              <p className="text-xs text-muted-foreground mt-1">
+                * הגרף מציג סך הקליקים של לינקים לפי היום שבו הלינק נוצר, לא לפי תאריך הקליק בפועל.
+              </p>
+            </div>
           </div>
 
           {isLoading ? (
@@ -593,7 +617,7 @@ export default function Analytics() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {links.slice(0, 20).map((link) => (
+                  {links.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map((link) => (
                     <tr key={link.id} className="hover:bg-muted/30 transition-colors">
                       <td className="px-4 lg:px-6 py-4">
                         <span className="text-sm text-muted-foreground">{link.campaigns?.name || "—"}</span>
@@ -631,6 +655,35 @@ export default function Analytics() {
                   ))}
                 </tbody>
               </table>
+              {totalLinks > PAGE_SIZE && (
+                <div className="flex items-center justify-between p-4 lg:px-6 border-t border-border">
+                  <span className="text-sm text-muted-foreground">
+                    עמוד {page + 1} מתוך {Math.ceil(totalLinks / PAGE_SIZE)}
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPage((p) => Math.max(0, p - 1))}
+                      disabled={page === 0}
+                      className="px-3 py-1.5 text-sm rounded-lg border border-border hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      הקודם
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPage((p) =>
+                          (p + 1) * PAGE_SIZE < totalLinks ? p + 1 : p,
+                        )
+                      }
+                      disabled={(page + 1) * PAGE_SIZE >= totalLinks}
+                      className="px-3 py-1.5 text-sm rounded-lg border border-border hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      הבא
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="p-8 text-center text-muted-foreground">

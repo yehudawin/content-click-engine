@@ -5,9 +5,19 @@ import { ChannelSelector } from "@/components/ChannelSelector";
 import { CampaignSelector } from "@/components/CampaignSelector";
 import { GeneratedBlock } from "@/components/GeneratedBlock";
 import { useChannels } from "@/hooks/useChannels";
+import { useCampaigns } from "@/hooks/useCampaigns";
 import { useCreateDubLink } from "@/hooks/useDubApi";
 import { useCreateGeneratedLink } from "@/hooks/useGeneratedLinks";
 import { LinkGenerationSchema } from "@/lib/validation";
+
+function slugify(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 80);
+}
 
 interface GeneratedBlockData {
   channelId: string;
@@ -26,10 +36,12 @@ export default function Generator() {
   const [isGenerating, setIsGenerating] = useState(false);
 
   const { data: channels, isLoading: channelsLoading } = useChannels();
+  const { data: campaigns } = useCampaigns();
   const createDubLink = useCreateDubLink();
   const createGeneratedLink = useCreateGeneratedLink();
 
   const handleGenerate = async () => {
+    if (isGenerating) return; // guard against double-click
     // Validate inputs
     const result = LinkGenerationSchema.safeParse({
       destinationUrl: destinationUrl.trim(),
@@ -50,23 +62,32 @@ export default function Generator() {
     setGeneratedBlocks([]);
 
     const newBlocks: GeneratedBlockData[] = [];
+    const campaign = selectedCampaign
+      ? campaigns?.find((c) => c.id === selectedCampaign)
+      : null;
+    const utmCampaign = campaign ? slugify(campaign.name) || "campaign" : "general";
 
     for (const channelId of selectedChannels) {
       const channel = channels?.find((c) => c.id === channelId);
       if (!channel) continue;
 
       try {
-        // Build URL with UTM parameters
+        // Build URL with UTM parameters (preserves any existing query params on destination URL)
         const url = new URL(result.data.destinationUrl);
-        url.searchParams.set("utm_source", channel.name.toLowerCase().replace(/\s+/g, "_"));
+        url.searchParams.set("utm_source", slugify(channel.name) || "channel");
         url.searchParams.set("utm_medium", "social");
-        url.searchParams.set("utm_campaign", selectedCampaign ? "campaign" : "general");
+        url.searchParams.set("utm_campaign", utmCampaign);
 
         // Create short link via Dub.co
         const dubLink = await createDubLink.mutateAsync({
           url: url.toString(),
-          tags: [channel.name],
+          tags: campaign ? [channel.name, campaign.name] : [channel.name],
         });
+
+        // Defensive validation - dub-proxy must return id and shortLink
+        if (!dubLink?.id || !dubLink?.shortLink) {
+          throw new Error("Dub API החזיר תגובה לא תקינה");
+        }
 
         // Save to database
         await createGeneratedLink.mutateAsync({

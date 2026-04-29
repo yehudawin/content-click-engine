@@ -26,6 +26,8 @@ export function useSyncStatus() {
       if (error) throw error;
       return data as SyncStatus | null;
     },
-    refetchInterval: 60_000, // Refresh every minute
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
+    staleTime: 30_000,
   });
 }

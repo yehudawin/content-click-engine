@@ -166,30 +166,19 @@ export function useApproveUser() {
 
 export function useSetUserRole() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async ({ userId, role }: { userId: string; role: "admin" | "user" }) => {
-      // First check if role exists
-      const { data: existing } = await supabase
+      // Atomic upsert based on the (user_id, role) unique constraint avoids
+      // the TOCTOU race that select-then-insert/update has when two admins
+      // change the same user's role concurrently.
+      const { error } = await supabase
         .from("user_roles")
-        .select("*")
-        .eq("user_id", userId)
-        .maybeSingle();
-
-      if (existing) {
-        // Update existing role
-        const { error } = await supabase
-          .from("user_roles")
-          .update({ role })
-          .eq("user_id", userId);
-        if (error) throw error;
-      } else {
-        // Insert new role
-        const { error } = await supabase
-          .from("user_roles")
-          .insert({ user_id: userId, role });
-        if (error) throw error;
-      }
+        .upsert(
+          { user_id: userId, role },
+          { onConflict: "user_id" },
+        );
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["all-profiles"] });

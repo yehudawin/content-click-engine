@@ -114,6 +114,7 @@ export type Database = {
           destination_url: string
           dub_link_id: string | null
           id: string
+          last_synced_at: string | null
           short_link: string
           user_id: string | null
         }
@@ -126,6 +127,7 @@ export type Database = {
           destination_url: string
           dub_link_id?: string | null
           id?: string
+          last_synced_at?: string | null
           short_link: string
           user_id?: string | null
         }
@@ -138,6 +140,7 @@ export type Database = {
           destination_url?: string
           dub_link_id?: string | null
           id?: string
+          last_synced_at?: string | null
           short_link?: string
           user_id?: string | null
         }
@@ -222,6 +225,11 @@ export type Database = {
         Returns: boolean
       }
       is_user_approved: { Args: { _user_id: string }; Returns: boolean }
+      sync_link_clicks: {
+        Args: { _link_id: string; _new_clicks: number }
+        Returns: undefined
+      }
+      reset_stale_sync_status: { Args: Record<string, never>; Returns: undefined }
     }
     Enums: {
       app_role: "admin" | "user"

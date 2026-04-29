@@ -54,10 +54,12 @@ export function useGeneratedLinks(filter?: LinksFilter) {
         query = query.eq("campaign_id", filter.campaignId);
       }
       if (filter?.dateFrom) {
-        query = query.gte("created_at", filter.dateFrom);
+        // Anchor at start of day in UTC to avoid drifting across timezones.
+        query = query.gte("created_at", `${filter.dateFrom}T00:00:00.000Z`);
       }
       if (filter?.dateTo) {
-        query = query.lte("created_at", filter.dateTo + "T23:59:59");
+        // Inclusive end-of-day in UTC.
+        query = query.lte("created_at", `${filter.dateTo}T23:59:59.999Z`);
       }
 
       const { data, error } = await query;
@@ -106,12 +108,21 @@ export function useUpdateLinkClicks() {
 
   return useMutation({
     mutationFn: async ({ id, clicks }: { id: string; clicks: number }) => {
-      const { error } = await supabase
-        .from("generated_links")
-        .update({ clicks })
-        .eq("id", id);
+      // Use the monotonic RPC so concurrent syncs cannot roll clicks backward.
+      // Falls back to a guarded UPDATE if the RPC is unavailable.
+      const { error: rpcError } = await supabase.rpc("sync_link_clicks", {
+        _link_id: id,
+        _new_clicks: clicks,
+      });
 
-      if (error) throw error;
+      if (rpcError) {
+        const { error } = await supabase
+          .from("generated_links")
+          .update({ clicks, last_synced_at: new Date().toISOString() })
+          .eq("id", id)
+          .lt("clicks", clicks);
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["generated-links"] });
