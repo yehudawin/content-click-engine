@@ -38,6 +38,8 @@ import {
   Legend,
   AreaChart,
   Area,
+  ComposedChart,
+  Bar,
   PieChart,
   Pie,
   RadialBarChart,
@@ -184,19 +186,26 @@ export default function Analytics() {
       {} as Record<string, { links: number; clicks: number }>,
     );
 
+    // Cumulative clicks: total clicks accumulated by all links created up to & including each day
+    let cumClicks = 0;
+    let cumLinks = 0;
     const series = days.map((day) => {
       const key = format(day, "yyyy-MM-dd");
       const d = byDate[key] || { links: 0, clicks: 0 };
+      cumClicks += d.clicks;
+      cumLinks += d.links;
       return {
         date: format(day, "dd/MM", { locale: he }),
         fullDate: key,
         links: d.links,
         clicks: d.clicks,
+        cumulativeClicks: cumClicks,
+        cumulativeLinks: cumLinks,
       };
     });
 
-    const r7 = series.slice(-7).reduce((s, d) => s + d.clicks, 0);
-    const p7 = series.slice(-14, -7).reduce((s, d) => s + d.clicks, 0);
+    const r7 = series.slice(-7).reduce((s, d) => s + d.links, 0);
+    const p7 = series.slice(-14, -7).reduce((s, d) => s + d.links, 0);
 
     return { timeSeriesData: series, recent7Clicks: r7, prev7Clicks: p7 };
   }, [links, filters.dateFrom]);
@@ -455,20 +464,20 @@ export default function Analytics() {
             <div>
               <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
                 <Calendar className="h-5 w-5 text-primary" />
-                מגמת קליקים — 30 ימים
+                צמיחה ב-30 הימים האחרונים
               </h2>
               <p className="text-xs text-muted-foreground mt-1">
-                סך קליקים מצטבר לפי יום יצירת הלינק
+                קליקים מצטברים מכלל הלינקים שנוצרו עד אותו יום, ומספר הלינקים החדשים שנוצרו ביום
               </p>
             </div>
             <div className="flex items-center gap-4 text-sm">
               <div className="flex items-center gap-2">
                 <span className="w-3 h-3 rounded-full bg-primary" />
-                <span className="text-muted-foreground">קליקים</span>
+                <span className="text-muted-foreground">קליקים מצטברים</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="w-3 h-3 rounded-full bg-accent" />
-                <span className="text-muted-foreground">לינקים חדשים</span>
+                <span className="text-muted-foreground">לינקים חדשים ביום</span>
               </div>
             </div>
           </div>
@@ -480,20 +489,17 @@ export default function Analytics() {
           ) : timeSeriesData.length > 0 ? (
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={timeSeriesData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <ComposedChart data={timeSeriesData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="grad-clicks" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.5} />
                       <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} />
                     </linearGradient>
-                    <linearGradient id="grad-links" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="hsl(var(--accent))" stopOpacity={0.4} />
-                      <stop offset="100%" stopColor="hsl(var(--accent))" stopOpacity={0} />
-                    </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                   <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={11} tickMargin={8} />
-                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                  <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                  <YAxis yAxisId="right" orientation="left" stroke="hsl(var(--muted-foreground))" fontSize={12} allowDecimals={false} />
                   <Tooltip
                     contentStyle={{
                       backgroundColor: "hsl(var(--card))",
@@ -504,25 +510,26 @@ export default function Analytics() {
                     }}
                     formatter={(value: number, name: string) => [
                       value.toLocaleString(),
-                      name === "clicks" ? "קליקים" : "לינקים חדשים",
+                      name === "cumulativeClicks" ? "קליקים מצטברים" : "לינקים חדשים",
                     ]}
                     labelFormatter={(label) => `תאריך: ${label}`}
                   />
                   <Area
+                    yAxisId="left"
                     type="monotone"
-                    dataKey="clicks"
+                    dataKey="cumulativeClicks"
                     stroke="hsl(var(--primary))"
                     strokeWidth={2.5}
                     fill="url(#grad-clicks)"
                   />
-                  <Area
-                    type="monotone"
+                  <Bar
+                    yAxisId="right"
                     dataKey="links"
-                    stroke="hsl(var(--accent))"
-                    strokeWidth={2}
-                    fill="url(#grad-links)"
+                    fill="hsl(var(--accent))"
+                    radius={[4, 4, 0, 0]}
+                    maxBarSize={18}
                   />
-                </AreaChart>
+                </ComposedChart>
               </ResponsiveContainer>
             </div>
           ) : (
@@ -560,7 +567,7 @@ export default function Analytics() {
                       strokeWidth={0}
                     >
                       {channelData.slice(0, 8).map((entry, i) => (
-                        <Cell key={i} fill={entry.color || PIE_PALETTE[i % PIE_PALETTE.length]} />
+                        <Cell key={i} fill={PIE_PALETTE[i % PIE_PALETTE.length]} />
                       ))}
                     </Pie>
                     <Tooltip
@@ -588,23 +595,29 @@ export default function Analytics() {
               </div>
             )}
 
-            {/* Mini legend */}
-            {channelData.slice(0, 5).length > 0 && (
-              <div className="mt-4 space-y-1.5 max-h-32 overflow-y-auto">
-                {channelData.slice(0, 5).map((c, i) => (
-                  <div key={c.name} className="flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span
-                        className="w-2.5 h-2.5 rounded-sm flex-shrink-0"
-                        style={{ backgroundColor: c.color || PIE_PALETTE[i % PIE_PALETTE.length] }}
-                      />
-                      <span className="truncate text-foreground">{c.name}</span>
+            {/* Legend */}
+            {channelData.slice(0, 8).length > 0 && (
+              <div className="mt-4 space-y-1.5 max-h-40 overflow-y-auto">
+                {channelData.slice(0, 8).map((c, i) => {
+                  const pct = totalClicks > 0 ? Math.round((c.clicks / totalClicks) * 100) : 0;
+                  return (
+                    <div key={c.name} className="flex items-center justify-between text-xs gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span
+                          className="w-2.5 h-2.5 rounded-sm flex-shrink-0"
+                          style={{ backgroundColor: PIE_PALETTE[i % PIE_PALETTE.length] }}
+                        />
+                        <span className="truncate text-foreground">{c.name}</span>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="text-muted-foreground tabular-nums">{pct}%</span>
+                        <span className="font-semibold tabular-nums text-foreground">
+                          {c.clicks.toLocaleString()}
+                        </span>
+                      </div>
                     </div>
-                    <span className="font-semibold tabular-nums text-muted-foreground flex-shrink-0">
-                      {c.clicks.toLocaleString()}
-                    </span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
