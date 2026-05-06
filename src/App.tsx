@@ -60,7 +60,7 @@ function AppRoutes() {
   return (
     <div className="min-h-screen flex w-full bg-background" dir="rtl">
       {user && <AppSidebar isAdmin={isAdmin} />}
-      <main className="flex-1 w-full">
+      <main className="flex-1 w-full min-w-0 overflow-x-hidden">
         <Suspense fallback={<RouteFallback />}>
           <Routes>
             <Route path="/auth" element={user ? <Navigate to="/" /> : <Auth />} />
