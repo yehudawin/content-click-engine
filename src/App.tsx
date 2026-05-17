@@ -24,6 +24,7 @@ const Analytics = lazyWithRetry(() => import("./pages/Analytics"));
 const Settings = lazy(() => import("./pages/Settings"));
 const Campaigns = lazy(() => import("./pages/Campaigns"));
 const AdminUsers = lazy(() => import("./pages/AdminUsers"));
+const QrCodes = lazy(() => import("./pages/QrCodes"));
 const Auth = lazy(() => import("./pages/Auth"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
@@ -101,6 +102,14 @@ function AppRoutes() {
               element={
                 <AuthGuard requireAdmin>
                   <AdminUsers />
+                </AuthGuard>
+              }
+            />
+            <Route
+              path="/qr-codes"
+              element={
+                <AuthGuard>
+                  <QrCodes />
                 </AuthGuard>
               }
             />

@@ -1,4 +1,4 @@
-import { Link2, BarChart3, Settings, Menu, X, Sparkles, FolderKanban, Users, LogOut } from "lucide-react";
+import { Link2, BarChart3, Settings, Menu, X, Sparkles, FolderKanban, Users, LogOut, QrCode } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -13,6 +13,7 @@ interface AppSidebarProps {
 const baseItems = [
   { title: "יצירת קישורים", url: "/", icon: Sparkles },
   { title: "קמפיינים", url: "/campaigns", icon: FolderKanban },
+  { title: "QR Codes", url: "/qr-codes", icon: QrCode },
   { title: "אנליטיקס", url: "/analytics", icon: BarChart3 },
   { title: "הגדרות", url: "/settings", icon: Settings },
 ];
