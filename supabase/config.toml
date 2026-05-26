@@ -5,3 +5,7 @@ verify_jwt = false
 
 [functions.sync-analytics]
 verify_jwt = false
+
+[functions.export-links-since]
+verify_jwt = false
+
